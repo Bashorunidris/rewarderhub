@@ -34763,7 +34763,7 @@ function createPhyCategoryCard(eventData) {
                     </div>` :
                     `<button  onclick="openTicketModal('${eventData.id || eventData.physicalEventId}')"
                     style="background: linear-gradient(135deg, #6c5ce7 0%, #764ba2 100%); color: white; border: none; padding: 12px 20px; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 15px; width: 100%; transition: all 0.3s ease; box-shadow: 0 4px 15px rgba(108, 92, 231, 0.3);">
-                        <i class="fas fa-ticket-alt" style="margin-right: 8px;"></i> Get Tickets
+                        <i class="fas fa-ticket-alt" style="margin-right: 8px;"></i> View
                     </button>`
                 }
             </div>
@@ -34994,7 +34994,7 @@ function createPhysicalEventDisplayCard(eventData) {
                     <i class="fas fa-calendar-times"></i> Ended
                 </div>` :
                 `<button class="get-ticket-btn-top" onclick="openTicketModal('${eventData.id || eventData.physicalEventId}')">
-                    <i class="fas fa-ticket-alt"></i> Get Ticket
+                    <i class="fas fa-ticket-alt"></i> View
                 </button>`
             }
             <button class="sharephy-btn" onclick="openSharephyModal('${eventData.eventLink || eventData.id || eventData.physicalEventId}')" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 2; transition: all 0.3s ease;">
@@ -38011,12 +38011,7 @@ function createEntertainmentCard(eventData) {
                         
             <!-- Action Buttons (Top Right) -->
             <div class="card-action-buttons">
-                <button class="card-btn edit-btn" onclick="editEventName('${eventData.eventId}')" title="Edit Event Name">
-                    <i class="fas fa-edit"></i>
-                </button>
-                <button class="card-btn delete-btn" onclick="deleteEvent('${eventData.eventId}')" title="Delete Event">
-                    <i class="fas fa-trash"></i>
-                </button>
+               
             </div>
                         
             <!-- Participants Counter (Top Right, below action buttons) -->
@@ -40239,12 +40234,7 @@ function createTicketListItem(ticket, index) {
             </div>
         </div>
         <div class="ticket-actions">
-            <button type="button" class="edit-ticket-btn" onclick="editPhysicalTicket(${index})">
-                <i class="fas fa-edit"></i>
-            </button>
-            <button type="button" class="delete-ticket-btn" onclick="deletePhysicalTicket(${index})">
-                <i class="fas fa-trash"></i>
-            </button>
+           
         </div>
     `;
     
