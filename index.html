@@ -21179,7 +21179,7 @@ tba-option {
         <!-- Get Tickets Modal -->
         <div class="event-modal-overlay" id="eventTicketsModal">
             <div class="event-modal">
-                <h3><i class="fas fa-ticket-alt"></i> Get Tickets</h3>
+                <h3><i class="fas fa-ticket-alt"></i>  View Event</h3>
                 <p>To purchase tickets for this event, copy the event name below and paste it in the search bar of the Rewarder app.</p>
                 
                 <div class="event-copy-section">
@@ -35556,7 +35556,7 @@ function createAdvancedPhysicalEventCard(eventData) {
                 </button>` :
                 `<button class="advanced-buy-btn" onclick="openTicketModal('${eventData.id || eventData.physicalEventId}')">
                     <i class="fas fa-ticket-alt"></i>
-                    Get Tickets
+                    View Event
                 </button>`
             }
         </div>
@@ -41475,14 +41475,7 @@ function createFullEventCard(cardDiv, eventData, backgroundStyle) {
             </div>
 
             <div class="event-action-tools">
-                <button class="edit-event-btn" onclick="openPhyEventEdit('${eventData.physicalEventId}')" title="Edit Event">
-                    <i class="fas fa-edit"></i>
-                    Edit Event
-                </button>
-                <button class="close-event-btn" onclick="openPhyEventClose('${eventData.physicalEventId}')" title="Close Event">
-                    <i class="fas fa-times-circle"></i>
-                    Close Event
-                </button>
+                
             </div>
             
             ${!hasNoTickets ? `
