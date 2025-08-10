@@ -3388,105 +3388,18 @@ body {
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
 }
 
-  .event-card-image {
+.event-card-image {
     width: 100%;
-    height: 200px; /* Increased base height for better mobile viewing */
+    height: 160px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll;
-    border-radius: 12px 12px 0 0; /* Rounded top corners */
-    overflow: hidden;
-    transition: all 0.3s ease;
+    background-size: cover;
+    background-position: center;
 }
 
-/* Desktop styles */
-@media (min-width: 1200px) {
-    .event-card-image {
-        height: 220px;
-        border-radius: 16px 16px 0 0;
-    }
-}
-
-/* Laptop styles */
-@media (min-width: 992px) and (max-width: 1199px) {
-    .event-card-image {
-        height: 200px;
-        border-radius: 14px 14px 0 0;
-    }
-}
-
-/* Tablet styles */
-@media (min-width: 769px) and (max-width: 991px) {
-    .event-card-image {
-        height: 180px;
-        border-radius: 12px 12px 0 0;
-    }
-}
-
-/* Small tablet / large mobile */
-@media (min-width: 481px) and (max-width: 768px) {
-    .event-card-image {
-        height: 160px;
-        border-radius: 10px 10px 0 0;
-        background-attachment: scroll; /* Better performance on tablets */
-    }
-}
-
-/* Mobile styles */
-@media (max-width: 480px) {
-    .event-card-image {
-        height: 140px;
-        border-radius: 8px 8px 0 0;
-        background-attachment: scroll;
-        background-size: cover !important;
-        background-position: center !important;
-        -webkit-background-size: cover !important; /* iOS Safari support */
-    }
-}
-
-/* Extra small mobile screens */
-@media (max-width: 320px) {
-    .event-card-image {
-        height: 120px;
-        border-radius: 6px 6px 0 0;
-    }
-}
-
-/* Landscape mobile orientation */
-@media (max-width: 896px) and (max-height: 414px) and (orientation: landscape) {
-    .event-card-image {
-        height: 100px;
-        border-radius: 6px 6px 0 0;
-    }
-}
-
-/* High DPI mobile displays */
-@media (-webkit-min-device-pixel-ratio: 2) and (max-width: 480px) {
-    .event-card-image {
-        background-size: cover !important;
-        -webkit-background-size: cover !important;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: crisp-edges;
-    }
-}
-
-/* iOS Safari specific fixes */
-@supports (-webkit-touch-callout: none) {
-    .event-card-image {
-        background-attachment: scroll !important;
-        -webkit-transform: translateZ(0); /* Force hardware acceleration */
-        -webkit-backface-visibility: hidden;
-        transform: translateZ(0);
-    }
-}
-
-/* Overlay with responsive adjustments */
 .event-card-image::before {
     content: '';
     position: absolute;
@@ -3495,143 +3408,6 @@ body {
     right: 0;
     bottom: 0;
     background: linear-gradient(135deg, rgba(0,0,0,0.3), rgba(0,0,0,0.1));
-    transition: all 0.3s ease;
-    z-index: 1;
-    pointer-events: none;
-}
-
-/* Hover effects for desktop */
-@media (min-width: 769px) {
-    .event-card-image:hover::before {
-        background: linear-gradient(135deg, rgba(0,0,0,0.2), rgba(0,0,0,0.05));
-    }
-    
-    .event-card-image:hover {
-        transform: scale(1.02);
-        box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
-    }
-}
-
-/* Touch device optimizations */
-@media (hover: none) and (pointer: coarse) {
-    .event-card-image {
-        background-attachment: scroll !important;
-        transform: none !important;
-    }
-    
-    .event-card-image:hover {
-        transform: none !important;
-    }
-}
-
-/* Content inside event card image */
-.event-card-image-content {
-    position: relative;
-    z-index: 2;
-    color: white;
-    text-align: center;
-    padding: 1rem;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-}
-
-@media (max-width: 480px) {
-    .event-card-image-content {
-        padding: 0.75rem;
-        font-size: 0.9rem;
-    }
-}
-
-@media (max-width: 320px) {
-    .event-card-image-content {
-        padding: 0.5rem;
-        font-size: 0.8rem;
-    }
-}
-
-/* Responsive image element inside card */
-.event-card-image img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center;
-    border-radius: inherit;
-    transition: transform 0.3s ease;
-}
-
-@media (min-width: 769px) {
-    .event-card-image:hover img {
-        transform: scale(1.05);
-    }
-}
-
-/* Loading placeholder */
-.event-card-image.loading {
-    background: linear-gradient(
-        90deg,
-        rgba(102, 126, 234, 0.1) 0%,
-        rgba(102, 126, 234, 0.3) 50%,
-        rgba(102, 126, 234, 0.1) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-    0% { background-position: -200% 0; }
-    100% { background-position: 200% 0; }
-}
-
-/* Aspect ratio maintenance for different screen sizes */
-@media (min-width: 769px) {
-    .event-card-image {
-        aspect-ratio: 16/9; /* Maintain aspect ratio on larger screens */
-        height: auto;
-        min-height: 180px;
-        max-height: 220px;
-    }
-}
-
-/* Card container adjustments */
-.event-card {
-    border-radius: 12px;
-    overflow: hidden;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-}
-
-@media (max-width: 480px) {
-    .event-card {
-        border-radius: 8px;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-}
-
-@media (max-width: 320px) {
-    .event-card {
-        border-radius: 6px;
-        box-shadow: 0 1px 6px rgba(0, 0, 0, 0.1);
-    }
-}
-
-/* Performance optimizations for mobile */
-@media (max-width: 768px) {
-    .event-card-image {
-        will-change: transform;
-        backface-visibility: hidden;
-        -webkit-backface-visibility: hidden;
-    }
-}
-
-/* Dark mode support */
-@media (prefers-color-scheme: dark) {
-    .event-card-image::before {
-        background: linear-gradient(135deg, rgba(0,0,0,0.5), rgba(0,0,0,0.3));
-    }
 }
 
 .event-category-badge {
@@ -4755,213 +4531,18 @@ body {
     transform: translateY(-8px) scale(1.02);
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
 }
+
 .advanced-event-background {
     width: 100%;
-    min-height: 100vh;
-    min-height: 100dvh; /* Dynamic viewport height for mobile browsers */
-    position: relative;
-    background-size: cover !important;
-    background-position: center center !important;
-    background-repeat: no-repeat !important;
-    background-attachment: scroll; /* Use scroll on mobile */
-    border-radius: 0; /* Remove border radius on mobile */
-    object-fit: cover;
-    overflow: hidden;
-    z-index: 1;
-}
-
-/* Desktop styles */
-@media (min-width: 768px) {
-    .advanced-event-background {
-        min-height: 80vh;
-        height: 100%;
-        border-radius: 24px;
-        background-attachment: fixed;
-        position: absolute;
-        top: 0;
-        left: 0;
-    }
-}
-
-/* Tablet styles */
-@media (min-width: 481px) and (max-width: 767px) {
-    .advanced-event-background {
-        min-height: 85vh;
-        height: 100%;
-        border-radius: 16px;
-        background-attachment: scroll;
-        position: absolute;
-        top: 0;
-        left: 0;
-    }
-}
-
-/* Mobile styles */
-@media (max-width: 480px) {
-    .advanced-event-background {
-        min-height: 100vh;
-        min-height: 100dvh;
-        height: auto;
-        border-radius: 0;
-        background-attachment: scroll;
-        background-size: cover !important;
-        background-position: center !important;
-        position: relative;
-        top: 0;
-        left: 0;
-    }
-}
-
-/* Extra small mobile screens */
-@media (max-width: 320px) {
-    .advanced-event-background {
-        min-height: 100vh;
-        min-height: 100dvh;
-        border-radius: 0;
-    }
-}
-
-/* iOS Safari specific fixes */
-@supports (-webkit-touch-callout: none) {
-    .advanced-event-background {
-        background-attachment: scroll !important;
-        -webkit-background-size: cover !important;
-        -webkit-transform: translateZ(0); /* Force hardware acceleration */
-        -webkit-backface-visibility: hidden;
-    }
-}
-
-/* Landscape mobile orientation */
-@media (max-width: 896px) and (max-height: 414px) and (orientation: landscape) {
-    .advanced-event-background {
-        min-height: 100vh;
-        height: 100vh;
-        background-attachment: scroll;
-        border-radius: 0;
-    }
-}
-
-/* High DPI mobile displays */
-@media (-webkit-min-device-pixel-ratio: 2) and (max-width: 480px) {
-    .advanced-event-background {
-        background-size: cover !important;
-        -webkit-background-size: cover !important;
-        image-rendering: -webkit-optimize-contrast;
-        image-rendering: crisp-edges;
-    }
-}
-
-/* Container for advanced event background */
-.advanced-event-container {
-    position: relative;
-    width: 100%;
-    overflow: hidden;
-    border-radius: 24px;
-}
-
-@media (max-width: 768px) {
-    .advanced-event-container {
-        border-radius: 16px;
-    }
-}
-
-@media (max-width: 480px) {
-    .advanced-event-container {
-        border-radius: 0;
-    }
-}
-
-/* If this is used as an image element */
-.advanced-event-background img {
-    width: 100%;
     height: 100%;
-    object-fit: cover;
-    object-position: center;
-    border-radius: inherit;
-}
-
-@media (max-width: 480px) {
-    .advanced-event-background img {
-        min-height: 100vh;
-        min-height: 100dvh;
-        border-radius: 0;
-    }
-}
-
-/* Overlay for better content readability */
-.advanced-event-overlay {
     position: absolute;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
-    background: linear-gradient(
-        135deg,
-        rgba(26, 26, 46, 0.6) 0%,
-        rgba(26, 26, 46, 0.4) 50%,
-        rgba(26, 26, 46, 0.6) 100%
-    );
-    z-index: 2;
-    pointer-events: none;
+    z-index: 1;
+    object-fit: cover;
+    border-radius: 24px;
 }
 
-/* Content positioning over background */
-.advanced-event-content {
-    position: relative;
-    z-index: 3;
-    color: white;
-    padding: 2rem;
-    min-height: inherit;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-}
-
-@media (max-width: 480px) {
-    .advanced-event-content {
-        padding: 1.5rem 1rem;
-        min-height: 100vh;
-        min-height: 100dvh;
-    }
-}
-
-/* For very short mobile screens in landscape */
-@media (max-height: 500px) and (orientation: landscape) {
-    .advanced-event-background {
-        min-height: 100vh;
-        height: 100vh;
-    }
-    
-    .advanced-event-content {
-        min-height: 100vh;
-        padding: 1rem;
-    }
-}
-
-/* Responsive background scaling for different screen densities */
-@media (min-resolution: 192dpi) {
-    .advanced-event-background {
-        background-size: cover !important;
-        image-rendering: -webkit-optimize-contrast;
-    }
-}
-
-/* Android Chrome specific fixes */
-@media screen and (-webkit-device-pixel-ratio: 1) {
-    .advanced-event-background {
-        background-attachment: scroll !important;
-    }
-}
-
-/* Edge case: very wide mobile screens */
-@media (min-width: 481px) and (max-width: 767px) and (min-aspect-ratio: 16/9) {
-    .advanced-event-background {
-        min-height: 70vh;
-        border-radius: 12px;
-    }
-}
 .advanced-event-overlay {
     position: absolute;
     top: 0;
@@ -35447,26 +35028,7 @@ function createPhysicalEventDisplayCard(eventData) {
     return card;
 }
 
-// Helper function to set responsive event card images
-function setEventCardImage(cardElement, imageUrl) {
-    const eventCardImage = cardElement.querySelector('.event-card-image');
-    if (eventCardImage && imageUrl) {
-        // Add loading class for placeholder effect
-        eventCardImage.classList.add('loading');
-        
-        // Create image to test loading
-        const img = new Image();
-        img.onload = function() {
-            eventCardImage.style.backgroundImage = `url('${imageUrl}')`;
-            eventCardImage.classList.remove('loading');
-        };
-        img.onerror = function() {
-            // Keep default gradient background if image fails
-            eventCardImage.classList.remove('loading');
-        };
-        img.src = imageUrl;
-    }
-}
+
 
 // Open Contact Modal
 function openPhyEventContactModal(eventId) {
