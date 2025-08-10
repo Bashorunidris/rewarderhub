@@ -29049,23 +29049,6 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-            
-          
-
-// When opening the profile modal, ensure logout button is properly set up
-function openProfileModal() {
-    const profileModal = document.getElementById('profileModal');
-    if (profileModal) {
-        profileModal.classList.add('active');
-        document.body.style.overflow = 'hidden';
-        
-        // Re-setup logout button each time modal opens
-        setupLogoutButton();
-        
-        // Load user profile data
-        loadUserProfileData();
-    }
-}
 
 
 function initializeProfileFunctionality() {
