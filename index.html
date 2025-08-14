@@ -38755,9 +38755,11 @@ function addCustomPhysicalCategory() {
     }
 }
 
-// Replace your existing switchPhysicalBackgroundTab function with this
-function switchPhysicalBackgroundTab(tabType) {
+   function switchPhysicalBackgroundTab(tabType) {
     console.log('Switching to tab:', tabType);
+    
+    // Store the current tab type globally so getPhysicalEventBackground can access it
+    window.currentPhysicalBgTab = tabType;
     
     // Update tab buttons
     document.querySelectorAll('.bg-tab').forEach(tab => tab.classList.remove('active'));
@@ -38765,6 +38767,15 @@ function switchPhysicalBackgroundTab(tabType) {
     // Add active class to clicked tab
     if (event && event.target) {
         event.target.classList.add('active');
+    } else {
+        // Find the correct tab button if event is not available
+        const tabs = document.querySelectorAll('.bg-tab');
+        tabs.forEach(tab => {
+            if (tab.textContent.toLowerCase().includes(tabType.toLowerCase()) ||
+                tab.onclick && tab.onclick.toString().includes(tabType)) {
+                tab.classList.add('active');
+            }
+        });
     }
     
     // Update content sections
@@ -38784,10 +38795,14 @@ function switchPhysicalBackgroundTab(tabType) {
     updatePhysicalPreview();
 }
 
-
-function handlePhysicalMediaUpload(input) {
+  function handlePhysicalMediaUpload(input) {
     const file = input.files[0];
-    if (!file) return;
+    if (!file) {
+        console.log('No file selected');
+        return;
+    }
+    
+    console.log('Media upload started:', file.name, file.type, file.size);
     
     // Validate file
     const maxSize = 10 * 1024 * 1024; // 10MB
@@ -38797,23 +38812,48 @@ function handlePhysicalMediaUpload(input) {
         return;
     }
     
+    // Validate file type
+    const validTypes = ['image/', 'video/'];
+    const isValidType = validTypes.some(type => file.type.startsWith(type));
+    
+    if (!isValidType) {
+        alert('Please select an image or video file');
+        input.value = '';
+        return;
+    }
+    
     const reader = new FileReader();
     reader.onload = function(e) {
+        console.log('File loaded successfully, data length:', e.target.result.length);
+        
         const previewContainer = document.getElementById('physicalMediaPreviewContainer');
         const preview = document.getElementById('physicalMediaPreview');
         
         if (file.type.startsWith('image/')) {
             preview.innerHTML = `<img src="${e.target.result}" alt="Background preview" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;">`;
         } else if (file.type.startsWith('video/')) {
-            preview.innerHTML = `<video src="${e.target.result}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;" controls></video>`;
+            preview.innerHTML = `<video src="${e.target.result}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;" controls muted></video>`;
         }
         
         previewContainer.style.display = 'block';
+        
+        // Make sure we're on the media tab
+        window.currentPhysicalBgTab = 'media';
+        
+        // Update the main preview
         updatePhysicalPreview();
+        
+        console.log('Media upload completed and preview updated');
+    };
+    
+    reader.onerror = function(error) {
+        console.error('File reading error:', error);
+        alert('Error reading file. Please try again.');
+        input.value = '';
     };
     
     reader.readAsDataURL(file);
-}
+}  
 
 function removePhysicalMedia() {
     document.getElementById('physicalBackgroundMedia').value = '';
@@ -38840,23 +38880,30 @@ function updatePhysicalPreview() {
     
     // Update background
     const backgroundPreview = document.getElementById('physicalEventBackgroundPreview');
-    const activeTab = document.querySelector('.bg-tab.active').textContent.toLowerCase();
+    if (!backgroundPreview) {
+        console.warn('Background preview element not found');
+        return;
+    }
     
-    if (activeTab === 'media') {
-        const mediaInput = document.getElementById('physicalBackgroundMedia');
-        if (mediaInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                backgroundPreview.style.backgroundImage = `url(${e.target.result})`;
-                backgroundPreview.style.backgroundSize = 'cover';
-                backgroundPreview.style.backgroundPosition = 'center';
-            };
-            reader.readAsDataURL(mediaInput.files[0]);
-        }
+    // Check for media file first
+    const mediaInput = document.getElementById('physicalBackgroundMedia');
+    if (mediaInput && mediaInput.files && mediaInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            backgroundPreview.style.backgroundImage = `url(${e.target.result})`;
+            backgroundPreview.style.backgroundSize = 'cover';
+            backgroundPreview.style.backgroundPosition = 'center';
+            backgroundPreview.style.background = ''; // Clear any gradient
+            console.log('Preview updated with media background');
+        };
+        reader.readAsDataURL(mediaInput.files[0]);
     } else {
-        const color1 = document.getElementById('physicalGradientColor1').value;
-        const color2 = document.getElementById('physicalGradientColor2').value;
+        // Use gradient background
+        const color1 = document.getElementById('physicalGradientColor1').value || '#FF6B6B';
+        const color2 = document.getElementById('physicalGradientColor2').value || '#4ECDC4';
         backgroundPreview.style.background = `linear-gradient(135deg, ${color1}, ${color2})`;
+        backgroundPreview.style.backgroundImage = ''; // Clear any image
+        console.log('Preview updated with gradient background');
     }
 }
 
@@ -39562,54 +39609,73 @@ function toggleTBASchedule() {
 // Fix the getPhysicalEventBackground function with better error handling
 async function getPhysicalEventBackground() {
     try {
-        const activeTab = document.querySelector('.bg-tab.active');
+        console.log('Getting physical event background...');
         
-        if (!activeTab) {
-            console.log('No active tab found, using default gradient');
-            return {
-                type: 'gradient',
-                color1: '#FF6B6B',
-                color2: '#4ECDC4',
-                gradient: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)'
-            };
+        // Use the stored tab type or try to detect it
+        let currentTab = window.currentPhysicalBgTab;
+        
+        if (!currentTab) {
+            // Try to detect active tab
+            const activeTab = document.querySelector('.bg-tab.active');
+            if (activeTab) {
+                const tabText = activeTab.textContent.toLowerCase();
+                if (tabText.includes('media') || tabText.includes('image') || tabText.includes('video')) {
+                    currentTab = 'media';
+                } else if (tabText.includes('gradient') || tabText.includes('color')) {
+                    currentTab = 'gradient';
+                }
+            }
         }
-
-        console.log('Active tab element:', activeTab);
-        console.log('Active tab text:', activeTab.textContent);
-
+        
+        console.log('Current background tab:', currentTab);
+        
+        // Check for media file regardless of tab detection
         const mediaInput = document.getElementById('physicalBackgroundMedia');
         const hasMediaFile = mediaInput && mediaInput.files && mediaInput.files[0];
         
-        const tabText = activeTab.textContent.toLowerCase();
-        const isMediaTab = tabText.includes('media') || tabText.includes('image') || tabText.includes('video') || hasMediaFile;
-
-        console.log('Is media tab?', isMediaTab);
-        console.log('Has media file?', hasMediaFile);
-
-        if (isMediaTab && hasMediaFile) {
+        console.log('Media input found:', !!mediaInput);
+        console.log('Has media file:', hasMediaFile);
+        
+        // If there's a media file, use it (regardless of which tab is "active")
+        if (hasMediaFile) {
             const file = mediaInput.files[0];
-            console.log('Processing media file:', file.name, file.type);
+            console.log('Processing media file:', file.name, file.type, 'Size:', file.size);
+            
+            // Validate file size (10MB limit)
+            const maxSize = 10 * 1024 * 1024;
+            if (file.size > maxSize) {
+                console.warn('File size exceeds limit:', file.size);
+                throw new Error('File size must be less than 10MB');
+            }
             
             return new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    console.log('File converted to base64');
-                    resolve({
+                    console.log('Media file converted to base64 successfully');
+                    const result = {
                         type: 'media',
                         data: e.target.result,
                         fileName: file.name,
-                        fileType: file.type
+                        fileType: file.type,
+                        fileSize: file.size
+                    };
+                    console.log('Media background data prepared:', {
+                        type: result.type,
+                        fileName: result.fileName,
+                        fileType: result.fileType,
+                        dataLength: result.data ? result.data.length : 0
                     });
+                    resolve(result);
                 };
                 reader.onerror = function(error) {
                     console.error('FileReader error:', error);
-                    reject(error);
+                    reject(new Error('Failed to read media file'));
                 };
                 reader.readAsDataURL(file);
             });
         }
-
-        // Gradient background (default)
+        
+        // Default to gradient background
         const color1Element = document.getElementById('physicalGradientColor1');
         const color2Element = document.getElementById('physicalGradientColor2');
         
@@ -39618,24 +39684,29 @@ async function getPhysicalEventBackground() {
         
         console.log('Using gradient background:', color1, color2);
         
-        return {
+        const gradientResult = {
             type: 'gradient',
             color1: color1,
             color2: color2,
             gradient: `linear-gradient(135deg, ${color1}, ${color2})`
         };
+        
+        console.log('Gradient background data prepared:', gradientResult);
+        return gradientResult;
+        
     } catch (error) {
         console.error('Error in getPhysicalEventBackground:', error);
         // Return default background instead of throwing
-        return {
+        const defaultResult = {
             type: 'gradient',
             color1: '#FF6B6B',
             color2: '#4ECDC4',
             gradient: 'linear-gradient(135deg, #FF6B6B, #4ECDC4)'
         };
+        console.log('Using default background due to error:', defaultResult);
+        return defaultResult;
     }
 }
-
 
 // Add this new function to collect ticket background data
 async function getTicketBackground() {
@@ -62124,3 +62195,4 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
+
