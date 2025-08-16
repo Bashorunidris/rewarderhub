@@ -34206,17 +34206,51 @@ async function loadPhysicalEventsDisplay() {
         allEventsSnapshot.forEach((doc) => {
             const eventData = { ...doc.data(), id: doc.id };
             
-            // Check if event hasn't passed 2 days
+            // Check if event should be included
+            let shouldInclude = false;
             const now = new Date();
-            const eventDate = new Date(eventData.startDateTime);
-            const twoDaysAfterEvent = new Date(eventDate.getTime() + (2 * 24 * 60 * 60 * 1000));
             
-            // Only include events that haven't passed 2 days
-            if (now <= twoDaysAfterEvent) {
+            // Always include TBA events
+            if (eventData.isTBA === true || 
+                eventData.schedulingStatus === 'TBA' || 
+                eventData.startDateTime === 'TBA' ||
+                eventData.endDateTime === 'TBA') {
+                
+                shouldInclude = true;
+                console.log('Including TBA event:', eventData.eventName);
+                
+            } else {
+                // For scheduled events, check if they haven't passed 2 days
+                try {
+                    const eventDate = new Date(eventData.startDateTime);
+                    
+                    // Validate that we got a valid date
+                    if (!isNaN(eventDate.getTime())) {
+                        const twoDaysAfterEvent = new Date(eventDate.getTime() + (2 * 24 * 60 * 60 * 1000));
+                        shouldInclude = now <= twoDaysAfterEvent;
+                        
+                        if (!shouldInclude) {
+                            console.log('Excluding past event:', eventData.eventName, 'Event date:', eventDate);
+                        }
+                    } else {
+                        // If date parsing failed, might be TBA or malformed - include it
+                        console.log('Including event with invalid date (might be TBA):', eventData.eventName);
+                        shouldInclude = true;
+                    }
+                } catch (dateError) {
+                    // If date parsing throws error, include the event (might be TBA)
+                    console.log('Date parsing error for event:', eventData.eventName, dateError);
+                    shouldInclude = true;
+                }
+            }
+            
+            if (shouldInclude) {
                 // Debug: Log the first event data to see structure
                 if (events.length === 0) {
                     console.log('First event data structure:', eventData);
                     console.log('Background data:', eventData.background);
+                    console.log('Is TBA:', eventData.isTBA);
+                    console.log('Scheduling status:', eventData.schedulingStatus);
                 }
                 
                 // Calculate total tickets sold
@@ -34228,24 +34262,51 @@ async function loadPhysicalEventsDisplay() {
                 }
                 
                 eventData.totalTicketsSold = ticketsSold;
-                eventData.createdAtTime = eventData.createdAt ? new Date(eventData.createdAt.seconds * 1000) : new Date();
+                
+                // Handle createdAt for sorting (support both Firestore timestamp and ISO string)
+                if (eventData.createdAt) {
+                    if (eventData.createdAt.seconds) {
+                        // Firestore timestamp
+                        eventData.createdAtTime = new Date(eventData.createdAt.seconds * 1000);
+                    } else if (typeof eventData.createdAt === 'string') {
+                        // ISO string
+                        eventData.createdAtTime = new Date(eventData.createdAt);
+                    } else {
+                        eventData.createdAtTime = new Date();
+                    }
+                } else {
+                    eventData.createdAtTime = new Date();
+                }
                 
                 events.push(eventData);
             }
         });
 
-        // Sort by ticket sales first, then by creation date
+        // Sort by ticket sales first, then by creation date, but prioritize TBA events
         events.sort((a, b) => {
+            const aIsTBA = a.isTBA === true || a.schedulingStatus === 'TBA' || a.startDateTime === 'TBA';
+            const bIsTBA = b.isTBA === true || b.schedulingStatus === 'TBA' || b.startDateTime === 'TBA';
+            
+            // TBA events get slight priority (appear mixed in but slightly boosted)
+            if (aIsTBA && !bIsTBA) {
+                return -0.5; // Slight priority to TBA
+            } else if (!aIsTBA && bIsTBA) {
+                return 0.5;
+            }
+            
+            // Both are TBA or both are scheduled - sort by tickets sold first
             if (b.totalTicketsSold !== a.totalTicketsSold) {
                 return b.totalTicketsSold - a.totalTicketsSold; // Most sold first
             }
+            
+            // Then by creation date
             return b.createdAtTime - a.createdAtTime; // Most recent first
         });
 
         // Take top 15 events
         const topEvents = events.slice(0, 15);
 
-        console.log(`Loaded ${topEvents.length} trending physical events`);
+        console.log(`Loaded ${topEvents.length} trending physical events (including TBA events)`);
 
         // Create cards with ads every 4th position
         let cardCount = 0;
@@ -34284,15 +34345,16 @@ async function loadPhysicalEventsDisplay() {
                 }
             ];
 
+            let eventIndex = 0; // Fix the missing variable declaration
             while (cardCount < 15 && eventIndex < 12) {
                 if ((cardCount + 1) % 4 === 0) {
-                    const adCard = createAdCard(cardCount);
+                    const adCard = createAdvancedAdCard(cardCount);
                     container.appendChild(adCard);
                 } else {
-                    const sampleEventData = sampleEvents[0];
+                    const sampleEventData = { ...sampleEvents[0] }; // Create a copy
                     sampleEventData.id = `sample_${eventIndex + 1}`;
                     sampleEventData.eventName = `Sample Event ${eventIndex + 1}`;
-                    const eventCard = createPhysicalEventDisplayCard(sampleEventData);
+                    const eventCard = createAdvancedPhysicalEventCard(sampleEventData);
                     container.appendChild(eventCard);
                     eventIndex++;
                 }
@@ -34312,6 +34374,84 @@ async function loadPhysicalEventsDisplay() {
         `;
     }
 }
+// Add this helper function to properly format event dates and handle TBA
+function formatEventDateTime(eventData) {
+    // Check if event is TBA
+    if (eventData.isTBA === true || 
+        eventData.schedulingStatus === 'TBA' || 
+        eventData.startDateTime === 'TBA' ||
+        eventData.endDateTime === 'TBA') {
+        return {
+            date: 'TBA',
+            time: 'TBA',
+            dateTime: 'TBA',
+            isTBA: true
+        };
+    }
+    
+    try {
+        // Try to parse the date
+        const startDate = new Date(eventData.startDateTime);
+        const endDate = new Date(eventData.endDateTime);
+        
+        // Check if dates are valid
+        if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
+            return {
+                date: 'TBA',
+                time: 'TBA',
+                dateTime: 'TBA',
+                isTBA: true
+            };
+        }
+        
+        // Format the dates
+        const dateOptions = { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+        };
+        const timeOptions = { 
+            hour: '2-digit', 
+            minute: '2-digit',
+            hour12: true 
+        };
+        
+        const formattedDate = startDate.toLocaleDateString('en-US', dateOptions);
+        const formattedTime = startDate.toLocaleTimeString('en-US', timeOptions);
+        
+        // Check if it's a single day event or multi-day
+        const isSameDay = startDate.toDateString() === endDate.toDateString();
+        
+        if (isSameDay) {
+            const endTime = endDate.toLocaleTimeString('en-US', timeOptions);
+            return {
+                date: formattedDate,
+                time: `${formattedTime} - ${endTime}`,
+                dateTime: `${formattedDate} ${formattedTime} - ${endTime}`,
+                isTBA: false
+            };
+        } else {
+            const endFormattedDate = endDate.toLocaleDateString('en-US', dateOptions);
+            const endFormattedTime = endDate.toLocaleTimeString('en-US', timeOptions);
+            return {
+                date: `${formattedDate} - ${endFormattedDate}`,
+                time: `${formattedTime} - ${endFormattedTime}`,
+                dateTime: `${formattedDate} ${formattedTime} - ${endFormattedDate} ${endFormattedTime}`,
+                isTBA: false
+            };
+        }
+        
+    } catch (error) {
+        console.log('Error formatting date for event:', eventData.eventName, error);
+        return {
+            date: 'TBA',
+            time: 'TBA',
+            dateTime: 'TBA',
+            isTBA: true
+        };
+    }
+}
+
 
 function showAllEvents() {
     openSeePhyMoreEventModal();
@@ -35195,7 +35335,8 @@ function openAdvancedEventContactModal(eventId) {
         });
     }
 }
-// Advanced Physical Event Card with Modern Design
+
+       // Advanced Physical Event Card with Modern Design - Updated with TBA support
 function createAdvancedPhysicalEventCard(eventData) {
     const card = document.createElement('div');
     card.className = 'advanced-event-card';
@@ -35210,30 +35351,57 @@ function createAdvancedPhysicalEventCard(eventData) {
     const currentUser = firebase.auth().currentUser;
     const userLiked = eventData.likedBy && currentUser ? eventData.likedBy.includes(currentUser.uid) : false;
     
-    // Check if event has ended (passed the event date)
-    const now = new Date();
-    const eventDate = new Date(eventData.startDateTime);
-    const hasEnded = now > eventDate;
+    // Check if event is TBA
+    const isTBA = eventData.isTBA === true || 
+                  eventData.schedulingStatus === 'TBA' || 
+                  eventData.startDateTime === 'TBA' ||
+                  eventData.endDateTime === 'TBA' ||
+                  !eventData.startDateTime ||
+                  eventData.startDateTime === '';
     
-    // Format date and time
-    let formattedDate = 'Date TBD';
+    // Check if event has ended (only for non-TBA events)
+    let hasEnded = false;
+    if (!isTBA) {
+        try {
+            const now = new Date();
+            const eventDate = new Date(eventData.startDateTime);
+            if (!isNaN(eventDate.getTime())) {
+                hasEnded = now > eventDate;
+            }
+        } catch (e) {
+            console.log('Error checking if event ended:', e);
+        }
+    }
+    
+    // Format date and time with TBA support
+    let formattedDate = 'TBA';
     let timeDisplay = '';
     
-    if (eventData.startDateTime) {
+    if (isTBA) {
+        formattedDate = 'TBA';
+        timeDisplay = '';
+    } else if (eventData.startDateTime) {
         try {
             const eventDate = new Date(eventData.startDateTime);
-            formattedDate = eventDate.toLocaleDateString('en-US', { 
-                weekday: 'short',
-                month: 'short', 
-                day: 'numeric' 
-            });
-            timeDisplay = eventDate.toLocaleTimeString('en-US', { 
-                hour: '2-digit', 
-                minute: '2-digit',
-                hour12: true 
-            });
+            if (!isNaN(eventDate.getTime())) {
+                formattedDate = eventDate.toLocaleDateString('en-US', { 
+                    weekday: 'short',
+                    month: 'short', 
+                    day: 'numeric' 
+                });
+                timeDisplay = eventDate.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: true 
+                });
+            } else {
+                formattedDate = 'TBA';
+                timeDisplay = '';
+            }
         } catch (e) {
             console.log('Date parsing error:', e);
+            formattedDate = 'TBA';
+            timeDisplay = '';
         }
     }
 
@@ -35374,23 +35542,26 @@ function createAdvancedPhysicalEventCard(eventData) {
         ` : `
             <div class="advanced-event-background" style="${backgroundStyle}"></div>
         `}
-        
-        <div class="advanced-event-overlay"></div>
+         <div class="advanced-event-overlay"></div>
         
         <div class="advanced-category-badge" style="background: ${categoryInfo.color}">
             <i class="${categoryInfo.icon}"></i>
             ${category}
         </div>
         
-       <div class="advanced-likes-badge"  style="background:}">
-       
-       <button onclick="togglePhyCategoryEventLike('${eventData.id}')" style="background: none; border: none; color: ${userLiked ? '#e74c3c' : '#fff'}; cursor: pointer; font-size: 18px; padding: 0; display: flex; align-items: center;">
-                        <i class="${userLiked ? 'fas' : 'far'} fa-heart" id="phy-heart-${eventData.id}"></i>
-                    </button>
-                    <span style="color: white; font-size: 14px; font-weight: 600;" id="phy-likes-${eventData.id}">${likesCount}</span>
-                </div>
+        ${isTBA ? `
+            <div class="advanced-tba-badge">
+                <i class="fas fa-clock"></i>
+                TBA
+            </div>
+        ` : ''}
         
-      
+       <div class="advanced-likes-badge">
+           <button onclick="togglePhyCategoryEventLike('${eventData.id}')" style="background: none; border: none; color: ${userLiked ? '#e74c3c' : '#fff'}; cursor: pointer; font-size: 18px; padding: 0; display: flex; align-items: center;">
+                <i class="${userLiked ? 'fas' : 'far'} fa-heart" id="phy-heart-${eventData.id}"></i>
+            </button>
+            <span style="color: white; font-size: 14px; font-weight: 600;" id="phy-likes-${eventData.id}">${likesCount}</span>
+        </div>
         
         <button class="sharephy-btn" ${hasEnded ? 'disabled style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.3); color: #666; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: not-allowed; display: flex; align-items: center; justify-content: center; z-index: 4; opacity: 0.5;"' : `onclick="openSharephyModal('${eventData.eventLink || eventData.id || eventData.physicalEventId}')" style="position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 4; transition: all 0.3s ease;"`}>
             <i class="fas fa-share-alt" style="font-size: 14px;"></i>
@@ -35407,18 +35578,27 @@ function createAdvancedPhysicalEventCard(eventData) {
                     </div>
                 </div>
                 
-                <div class="advanced-detail-row">
-                    <div class="advanced-detail-item">
-                        <i class="fas fa-calendar-alt"></i>
-                        <span>${formattedDate}</span>
-                    </div>
-                    ${timeDisplay ? `
-                        <div class="advanced-detail-item">
-                            <i class="fas fa-clock"></i>
-                            <span>${timeDisplay}</span>
+                ${isTBA ? `
+                    <div class="advanced-detail-row">
+                        <div class="advanced-detail-item tba-datetime">
+                            <i class="fas fa-calendar-alt" style="color: #ffd700;"></i>
+                            <span style="color: #ffd700; font-weight: 500; font-style: italic;">Date & Time: TBA</span>
                         </div>
-                    ` : ''}
-                </div>
+                    </div>
+                ` : `
+                    <div class="advanced-detail-row">
+                        <div class="advanced-detail-item">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>${formattedDate}</span>
+                        </div>
+                        ${timeDisplay ? `
+                            <div class="advanced-detail-item">
+                                <i class="fas fa-clock"></i>
+                                <span>${timeDisplay}</span>
+                            </div>
+                        ` : ''}
+                    </div>
+                `}
             </div>
             
             ${sponsorsHtml ? `
@@ -35437,7 +35617,7 @@ function createAdvancedPhysicalEventCard(eventData) {
                 </button>` :
                 `<button class="advanced-buy-btn" onclick="openTicketModal('${eventData.id || eventData.physicalEventId}')">
                     <i class="fas fa-ticket-alt"></i>
-                    View Event
+                    ${isTBA ? 'More Info' : 'View Event'}
                 </button>`
             }
         </div>
@@ -35445,6 +35625,8 @@ function createAdvancedPhysicalEventCard(eventData) {
 
     return card;
 }
+
+
 
 function toggleWithdrawVisibility(eventId) {
     const withdrawAmount = document.getElementById(`withdraw-${eventId}`);
@@ -41073,25 +41255,25 @@ function createPhysicalEventCard(eventData) {
                 border-top: 1px solid #e9ecef;
                 padding-top: 16px;
             ">
-                <div class="event-action-tools" style="display: flex; gap: 8px; margin-bottom: 16px;">
-                    <button class="edit-event-btn" onclick="openPhyEventEdit('${eventData.physicalEventId}')" title="Edit Event" style="
-                        background: linear-gradient(135deg, #007bff, #0056b3);
-                        color: white;
-                        border: none;
-                        padding: 8px 16px;
-                        border-radius: 6px;
-                        cursor: pointer;
-                        font-weight: 600;
-                        font-size: 13px;
-                        display: flex;
-                        align-items: center;
-                        gap: 6px;
-                        transition: all 0.3s ease;
-                        flex: 1;
-                    ">
-                        <i class="fas fa-edit"></i>
-                        Edit Event
-                    </button>
+               
+               <button class="change-event-btn" onclick="openPhyEventChange('${eventData.physicalEventId}')" title="Change Event Details" style="
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    flex: 1;
+">
+    <i class="fas fa-exchange-alt"></i>
+    Change Event
+</button>
                     <button class="close-event-btn" onclick="openPhyEventClose('${eventData.physicalEventId}')" title="Close Event" style="
                         background: linear-gradient(135deg, #dc3545, #c82333);
                         color: white;
@@ -41503,6 +41685,24 @@ ${eventData.phyeveContactInfo ? `
         </div>
     </div>
 ` : ''}
+<button class="change-event-btn" onclick="openPhyEventChange('${eventData.physicalEventId}')" title="Change Event Details" style="
+    background: linear-gradient(135deg, #f39c12, #e67e22);
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.3s ease;
+    flex: 1;
+">
+    <i class="fas fa-exchange-alt"></i>
+    Change Event
+</button>
             <div class="sponsors-section">
                 <div class="sponsors-header">
                     <h4>Event Sponsors</h4>
@@ -43695,12 +43895,18 @@ function showPromoCodeNotification(promoCode) {
 }
 
 
-// Function to open edit event popup with enhanced features including contact info
-async function openPhyEventEdit(eventId) {
+       
+           
+    
+   // Open Change Event Modal - fetches data by eventId and populates form
+async function openPhyEventChange(eventId) {
     try {
-        console.log('Opening edit for event:', eventId);
+        console.log('Opening change modal for event:', eventId);
         
-        // Get event data from Firebase
+        // Show loading indicator
+        showToast('Loading event data...', 'info', 1000);
+        
+        // Fetch event data from Firebase using eventId
         if (typeof firebase === 'undefined') {
             throw new Error('Firebase not available');
         }
@@ -43709,393 +43915,586 @@ async function openPhyEventEdit(eventId) {
         const eventDoc = await db.collection('physicalEvents').doc(eventId).get();
         
         if (!eventDoc.exists) {
-            showNotification('Event not found', 'error');
+            showToast('Event not found', 'error');
             return;
         }
         
         const eventData = eventDoc.data();
-        console.log('Event data loaded:', eventData);
+        console.log('Event data loaded for change:', eventData);
         
-        // Check if event is TBA
-        const isTBA = eventData.isTBA || eventData.schedulingStatus === 'TBA' || 
-                      eventData.startDateTime === 'TBA' || eventData.endDateTime === 'TBA';
-        
-        // Handle dates safely
-        let startDateValue = '';
-        let startTimeValue = '';
-        let endDateValue = '';
-        let endTimeValue = '';
-        
-        if (!isTBA && eventData.startDateTime && eventData.startDateTime !== 'TBA') {
-            const startDate = new Date(eventData.startDateTime);
-            startDateValue = startDate.toISOString().split('T')[0];
-            startTimeValue = startDate.toTimeString().slice(0, 5);
-        }
-        
-        if (!isTBA && eventData.endDateTime && eventData.endDateTime !== 'TBA') {
-            const endDate = new Date(eventData.endDateTime);
-            endDateValue = endDate.toISOString().split('T')[0];
-            endTimeValue = endDate.toTimeString().slice(0, 5);
-        }
-        
-        // Create edit modal
-        const modal = document.createElement('div');
-        modal.className = 'phyeventedit-modal-overlay';
-        modal.id = 'phyeventedit-modal';
-        
-        modal.innerHTML = `
-            <div class="phyeventedit-modal">
-                <div class="modal-header">
-                    <h3><i class="fas fa-edit"></i> Edit Physical Event</h3>
-                    <button class="close-modal-btn" onclick="closePhyEventEdit()" type="button">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-                
-                <div class="modal-body">
-                    <form id="editEventForm">
-                        <!-- Event Name -->
-                        <div class="form-group">
-                            <label>Event Name</label>
-                            <input type="text" id="editEventName" class="form-input" value="${eventData.eventName || ''}" required>
-                        </div>
-                        
-                        <!-- Event Description -->
-                        <div class="form-group">
-                            <label>Event Description</label>
-                            <textarea id="editEventDescription" class="form-textarea" rows="4" placeholder="Describe your event">${eventData.description || ''}</textarea>
-                        </div>
-                        
-                        <!-- Event Link -->
-                        <div class="form-group">
-                            <label>Event Link</label>
-                            <input type="text" id="editEventLink" class="form-input" value="${eventData.eventLink || ''}" required>
-                        </div>
-                        
-                        <!-- Location -->
-                        <div class="form-group">
-                            <label>Location</label>
-                            <textarea id="editEventLocation" class="form-textarea" rows="3" required>${eventData.location || ''}</textarea>
-                        </div>
-                        
-                        <!-- TBA Scheduling Option -->
-                        <div class="form-group">
-                            <label class="tba-checkbox">
-                                <input type="checkbox" id="editTBASchedule" ${isTBA ? 'checked' : ''} onchange="toggleEditTBASchedule()">
-                                <span>To Be Announced (TBA)</span>
-                            </label>
-                        </div>
-                        
-                        <!-- Date and Time Section -->
-                        <div class="datetime-section" id="editDateTimeSection" style="${isTBA ? 'display: none;' : ''}">
-                            <h4>Event Schedule</h4>
-                            <div class="datetime-row">
-                                <div class="datetime-field">
-                                    <label>Start Date</label>
-                                    <input type="date" id="editStartDate" class="form-input" value="${startDateValue}">
-                                </div>
-                                <div class="datetime-field">
-                                    <label>Start Time</label>
-                                    <input type="time" id="editStartTime" class="form-input" value="${startTimeValue}">
-                                </div>
-                            </div>
-                            <div class="datetime-row">
-                                <div class="datetime-field">
-                                    <label>End Date</label>
-                                    <input type="date" id="editEndDate" class="form-input" value="${endDateValue}">
-                                </div>
-                                <div class="datetime-field">
-                                    <label>End Time</label>
-                                    <input type="time" id="editEndTime" class="form-input" value="${endTimeValue}">
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Contact Information Section -->
-                        <div class="form-group">
-                            <h4 style="margin: 20px 0 15px 0; color: #495057; display: flex; align-items: center; gap: 8px;">
-                                <i class="fas fa-address-book" style="color: #007bff;"></i>
-                                Contact Information (Optional)
-                            </h4>
-                            <div class="contact-edit-section" style="
-                                background: #f8f9fa;
-                                border: 1px solid #e9ecef;
-                                border-radius: 8px;
-                                padding: 20px;
-                                margin-bottom: 20px;
-                            ">
-                                <!-- Host Name -->
-                                <div class="form-group">
-                                    <label>Host Name</label>
-                                    <input type="text" id="editHostName" class="form-input" value="${eventData.phyeveContactInfo?.hostName || ''}" placeholder="Host or contact person name" maxlength="50">
-                                </div>
-                                
-                                <!-- Phone Number -->
-                                <div class="form-group">
-                                    <label>Phone Number</label>
-                                    <input type="tel" id="editPhoneNumber" class="form-input" value="${eventData.phyeveContactInfo?.phoneNumber || ''}" placeholder="+234 xxx xxx xxxx">
-                                </div>
-                                
-                                <!-- Contact Links Grid -->
-                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 15px;">
-                                    <!-- Website URL -->
-                                    <div class="form-group">
-                                        <label>Website URL</label>
-                                        <input type="url" id="editWebsiteUrl" class="form-input" value="${eventData.phyeveContactInfo?.websiteUrl || ''}" placeholder="https://website.com">
-                                    </div>
-                                    
-                                    <!-- Instagram -->
-                                    <div class="form-group">
-                                        <label>Instagram URL</label>
-                                        <input type="url" id="editInstagramUrl" class="form-input" value="${eventData.phyeveContactInfo?.instagramUrl || ''}" placeholder="https://instagram.com/username">
-                                    </div>
-                                    
-                                    <!-- TikTok -->
-                                    <div class="form-group">
-                                        <label>TikTok URL</label>
-                                        <input type="url" id="editTiktokUrl" class="form-input" value="${eventData.phyeveContactInfo?.tiktokUrl || ''}" placeholder="https://tiktok.com/@username">
-                                    </div>
-                                    
-                                    <!-- Facebook -->
-                                    <div class="form-group">
-                                        <label>Facebook URL</label>
-                                        <input type="url" id="editFacebookUrl" class="form-input" value="${eventData.phyeveContactInfo?.facebookUrl || ''}" placeholder="https://facebook.com/page">
-                                    </div>
-                                    
-                                    <!-- Twitter -->
-                                    <div class="form-group">
-                                        <label>Twitter/X URL</label>
-                                        <input type="url" id="editTwitterUrl" class="form-input" value="${eventData.phyeveContactInfo?.twitterUrl || ''}" placeholder="https://twitter.com/username">
-                                    </div>
-                                    
-                                    <!-- YouTube -->
-                                    <div class="form-group">
-                                        <label>YouTube URL</label>
-                                        <input type="url" id="editYoutubeUrl" class="form-input" value="${eventData.phyeveContactInfo?.youtubeUrl || ''}" placeholder="https://youtube.com/channel">
-                                    </div>
-                                    
-                                    <!-- LinkedIn -->
-                                    <div class="form-group">
-                                        <label>LinkedIn URL</label>
-                                        <input type="url" id="editLinkedinUrl" class="form-input" value="${eventData.phyeveContactInfo?.linkedinUrl || ''}" placeholder="https://linkedin.com/in/profile">
-                                    </div>
-                                    
-                                    <!-- WhatsApp -->
-                                    <div class="form-group">
-                                        <label>WhatsApp URL</label>
-                                        <input type="text" id="editWhatsappUrl" class="form-input" value="${eventData.phyeveContactInfo?.whatsappUrl || ''}" placeholder="https://wa.me/1234567890">
-                                    </div>
-                                </div>
-                                
-                                <!-- Custom Links Section -->
-                                <div style="margin-top: 20px;">
-                                    <h5 style="margin-bottom: 15px; color: #495057;">Custom Links</h5>
-                                    
-                                    <!-- Custom Link 1 -->
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                        <div class="form-group">
-                                            <label>Custom Link 1 Name</label>
-                                            <input type="text" id="editCustomLink1Name" class="form-input" value="${eventData.phyeveContactInfo?.customLink1Name || ''}" placeholder="e.g. My Portfolio" maxlength="30">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Custom Link 1 URL</label>
-                                            <input type="url" id="editCustomLink1Url" class="form-input" value="${eventData.phyeveContactInfo?.customLink1Url || ''}" placeholder="https://yourlink.com">
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Custom Link 2 -->
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
-                                        <div class="form-group">
-                                            <label>Custom Link 2 Name</label>
-                                            <input type="text" id="editCustomLink2Name" class="form-input" value="${eventData.phyeveContactInfo?.customLink2Name || ''}" placeholder="e.g. My Store" maxlength="30">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Custom Link 2 URL</label>
-                                            <input type="url" id="editCustomLink2Url" class="form-input" value="${eventData.phyeveContactInfo?.customLink2Url || ''}" placeholder="https://yourlink.com">
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- Custom Link 3 -->
-                                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                                        <div class="form-group">
-                                            <label>Custom Link 3 Name</label>
-                                            <input type="text" id="editCustomLink3Name" class="form-input" value="${eventData.phyeveContactInfo?.customLink3Name || ''}" placeholder="e.g. My Channel" maxlength="30">
-                                        </div>
-                                        <div class="form-group">
-                                            <label>Custom Link 3 URL</label>
-                                            <input type="url" id="editCustomLink3Url" class="form-input" value="${eventData.phyeveContactInfo?.customLink3Url || ''}" placeholder="https://yourlink.com">
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Contact Preview -->
-                                <div style="margin-top: 20px; padding: 15px; background: white; border: 1px solid #dee2e6; border-radius: 8px;">
-                                    <h6 style="margin: 0 0 10px 0; color: #495057;">Contact Preview</h6>
-                                    <small style="color: #6c757d;">Contact information will be displayed in your event cards for attendees to reach you.</small>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Event Background Section -->
-                        <div class="form-group">
-                            <h4>Event Background</h4>
-                            <div class="background-edit-section">
-                                <div class="background-tabs">
-                                    <button type="button" class="bg-tab active" onclick="switchEditBackgroundTab('gradient')" data-tab="gradient">Gradient</button>
-                                    <button type="button" class="bg-tab" onclick="switchEditBackgroundTab('media')" data-tab="media">Media</button>
-                                </div>
-                                
-                                <div class="background-content">
-                                    <!-- Gradient Background -->
-                                    <div class="bg-content active" id="editGradientContent">
-                                        <div class="gradient-controls">
-                                            <div class="color-input-group">
-                                                <label>Color 1</label>
-                                                <input type="color" id="editGradientColor1" class="gradient-color-input" value="${eventData.background?.color1 || '#FF6B6B'}" onchange="updateEditGradientPreview()">
-                                            </div>
-                                            <div class="color-input-group">
-                                                <label>Color 2</label>
-                                                <input type="color" id="editGradientColor2" class="gradient-color-input" value="${eventData.background?.color2 || '#4ECDC4'}" onchange="updateEditGradientPreview()">
-                                            </div>
-                                        </div>
-                                        <div class="gradient-preview" id="editGradientPreview"></div>
-                                    </div>
-                                    
-                                    <!-- Media Background -->
-                                    <div class="bg-content" id="editMediaContent">
-                                        <input type="file" id="editBackgroundMedia" accept="image/*,video/*,.gif" class="file-input" onchange="handleEditMediaUpload(this)">
-                                        <label for="editBackgroundMedia" class="file-label">
-                                            <i class="fas fa-upload"></i>
-                                            Choose Media (Image, GIF, Video)
-                                        </label>
-                                        <div id="editMediaPreviewContainer" class="media-preview-container" style="display: none;">
-                                            <div id="editMediaPreview" class="media-preview"></div>
-                                            <button type="button" class="remove-media-btn" onclick="removeEditMedia()">
-                                                <i class="fas fa-trash"></i>
-                                                Remove Media
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- Background Preview -->
-                                <div class="background-preview-section">
-                                    <label>Background Preview</label>
-                                    <div class="event-background-preview" id="editEventBackgroundPreview">
-                                        <div class="preview-overlay">
-                                            <h3 class="preview-event-title">${eventData.eventName || 'Your Event Name'}</h3>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Tickets Section -->
-                        <div class="tickets-edit-section">
-                            <h4>Event Tickets</h4>
-                            <div id="editTicketsList">
-                                ${generateAdvancedEditTicketsList(eventData.tickets || [])}
-                            </div>
-                        </div>
-                        
-                        <!-- Modal Actions -->
-                        <div class="modal-actions">
-                            <button type="button" onclick="closePhyEventEdit()" class="cancel-btn">Cancel</button>
-                            <button type="button" onclick="updateAdvancedPhysicalEvent('${eventId}')" class="update-btn">
-                                <i class="fas fa-save"></i> Update Event
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        
-        // Initialize background preview
-        setTimeout(() => {
-            updateEditGradientPreview();
-            updateEditBackgroundPreview();
-        }, 100);
+        // Create change modal with pre-populated data
+        createChangeEventModal(eventId, eventData);
         
     } catch (error) {
-        console.error('Error opening edit modal:', error);
-        showNotification('Error loading event data: ' + error.message, 'error');
+        console.error('Error opening change modal:', error);
+        showToast('Error loading event data: ' + error.message, 'error');
     }
 }
 
-// Toggle TBA schedule in edit mode
-function toggleEditTBASchedule() {
-    const tbaCheckbox = document.getElementById('editTBASchedule');
-    const dateTimeSection = document.getElementById('editDateTimeSection');
+// Create Change Event Modal with populated data
+function createChangeEventModal(eventId, eventData) {
+    // Remove existing modal if any
+    const existingModal = document.getElementById('phyeventchange-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Check if event is TBA
+    const isTBA = eventData.isTBA === true || 
+                  eventData.schedulingStatus === 'TBA' || 
+                  eventData.startDateTime === 'TBA' ||
+                  eventData.endDateTime === 'TBA';
+    
+    // Handle dates safely for form population
+    let startDateValue = '';
+    let startTimeValue = '';
+    let endDateValue = '';
+    let endTimeValue = '';
+    
+    if (!isTBA && eventData.startDateTime && eventData.startDateTime !== 'TBA') {
+        try {
+            const startDate = new Date(eventData.startDateTime);
+            if (!isNaN(startDate.getTime())) {
+                startDateValue = startDate.toISOString().split('T')[0];
+                startTimeValue = startDate.toTimeString().slice(0, 5);
+            }
+        } catch (e) {
+            console.log('Error parsing start date:', e);
+        }
+    }
+    
+    if (!isTBA && eventData.endDateTime && eventData.endDateTime !== 'TBA') {
+        try {
+            const endDate = new Date(eventData.endDateTime);
+            if (!isNaN(endDate.getTime())) {
+                endDateValue = endDate.toISOString().split('T')[0];
+                endTimeValue = endDate.toTimeString().slice(0, 5);
+            }
+        } catch (e) {
+            console.log('Error parsing end date:', e);
+        }
+    }
+    
+    const modal = document.createElement('div');
+    modal.className = 'phyeventchange-modal-overlay';
+    modal.id = 'phyeventchange-modal';
+    modal.style.cssText = `
+
+     position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+        backdrop-filter: blur(3px);
+    `;
+    
+    modal.innerHTML = `
+        <div class="phyeventchange-modal" style="
+            background: white;
+            border-radius: 15px;
+            max-width: 800px;
+            width: 95%;
+            max-height: 95vh;
+            overflow-y: auto;
+            position: relative;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            color: #333;
+        ">
+            <div class="modal-header" style="
+                padding: 20px;
+                border-bottom: 2px solid #e9ecef;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                background: linear-gradient(135deg, #f39c12, #e67e22);
+                color: white;
+                border-radius: 15px 15px 0 0;
+            ">
+                <h3 style="margin: 0; font-size: 20px; font-weight: 700; color: white;">
+                    <i class="fas fa-exchange-alt" style="margin-right: 10px;"></i>
+                    Change Event Details
+                </h3>
+                <button class="close-modal-btn" onclick="closePhyEventChange()" type="button" style="
+                    background: rgba(255,255,255,0.2);
+                    border: none;
+                    color: white;
+                    font-size: 24px;
+                    cursor: pointer;
+                    padding: 5px;
+                    width: 35px;
+                    height: 35px;
+                    border-radius: 50%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    transition: all 0.2s ease;
+                " onmouseover="this.style.background='rgba(255,255,255,0.3)'" onmouseout="this.style.background='rgba(255,255,255,0.2)'">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" style="padding: 25px; color: #333;">
+                <form id="changeEventForm">
+                    <!-- Basic Event Information -->
+                    <div class="section-group" style="margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-info-circle" style="color: #f39c12;"></i>
+                            Basic Information
+                        </h4>
+                        
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Event Name *</label>
+                                <input type="text" id="changeEventName" class="form-input" value="${eventData.eventName || ''}" required style="
+                                    width: 100%;
+                                    padding: 10px 12px;
+                                    border: 2px solid #e9ecef;
+                                    border-radius: 6px;
+                                    font-size: 14px;
+                                    transition: border-color 0.2s ease;
+                                    box-sizing: border-box;
+                                    color: #333;
+                                    background: white;
+                                ">
+                            </div>
+                            
+                            <div class="form-group">
+                                <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Event Link *</label>
+                                <input type="text" id="changeEventLink" class="form-input" value="${eventData.eventLink || ''}" required style="
+                                    width: 100%;
+                                    padding: 10px 12px;
+                                    border: 2px solid #e9ecef;
+                                    border-radius: 6px;
+                                    font-size: 14px;
+                                    transition: border-color 0.2s ease;
+                                    box-sizing: border-box;
+                                    color: #333;
+                                    background: white;
+                                ">
+                            </div>
+                        </div>
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Event Description *</label>
+                            <textarea id="changeEventDescription" rows="4" required style="
+                                width: 100%;
+                                padding: 10px 12px;
+                                border: 2px solid #e9ecef;
+                                border-radius: 6px;
+                                font-size: 14px;
+                                resize: vertical;
+                                box-sizing: border-box;
+                                color: #333;
+                                background: white;
+                                font-family: inherit;
+                            ">${eventData.description || ''}</textarea>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Location *</label>
+                            <textarea id="changeEventLocation" rows="2" required style="
+                                width: 100%;
+                                padding: 10px 12px;
+                                border: 2px solid #e9ecef;
+                                border-radius: 6px;
+                                font-size: 14px;
+                                resize: vertical;
+                                box-sizing: border-box;
+                                color: #333;
+                                background: white;
+                                font-family: inherit;
+                            ">${eventData.location || ''}</textarea>
+                        </div>
+                    </div>
+                    
+                    <!-- Schedule Section -->
+                    <div class="section-group" style="margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-calendar-alt" style="color: #f39c12;"></i>
+                            Event Schedule
+                        </h4>
+                        
+                        <div class="form-group" style="margin-bottom: 15px;">
+                            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; color: #333;">
+                                <input type="checkbox" id="changeTBASchedule" ${isTBA ? 'checked' : ''} onchange="toggleChangeTBASchedule()">
+                                <span style="font-weight: 600; color: #333;">To Be Announced (TBA)</span>
+                            </label>
+                        </div>
+                        
+                        <div class="datetime-section" id="changeDateTimeSection" style="${isTBA ? 'display: none;' : ''}">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Start Date</label>
+                                    <input type="date" id="changeStartDate" value="${startDateValue}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Start Time</label>
+                                    <input type="time" id="changeStartTime" value="${startTimeValue}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                            </div>
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">End Date</label>
+                                    <input type="date" id="changeEndDate" value="${endDateValue}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">End Time</label>
+                                    <input type="time" id="changeEndTime" value="${endTimeValue}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Background Section -->
+                    <div class="section-group" style="margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-palette" style="color: #f39c12;"></i>
+                            Event Background
+                        </h4>
+                        
+                        <div class="background-tabs" style="display: flex; gap: 8px; margin-bottom: 15px;">
+                            <button type="button" class="change-bg-tab active" onclick="switchChangeBackgroundTab('gradient')" data-tab="gradient" style="
+                                padding: 8px 16px;
+                                background: #007bff;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 13px;
+                                font-weight: 600;
+                                transition: all 0.2s ease;
+                            ">Gradient</button>
+                            <button type="button" class="change-bg-tab" onclick="switchChangeBackgroundTab('media')" data-tab="media" style="
+                                padding: 8px 16px;
+                                background: #6c757d;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 13px;
+                                font-weight: 600;
+                                transition: all 0.2s ease;
+                            ">Media</button>
+                        </div>
+                        
+                        <div class="background-content">
+                            <!-- Gradient Background -->
+                            <div class="change-bg-content active" id="changeGradientContent">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                    <div class="form-group">
+                                        <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Color 1</label>
+                                        <input type="color" id="changeGradientColor1" value="${eventData.background?.color1 || '#FF6B6B'}" onchange="updateChangeGradientPreview()" style="
+                                            width: 100%;
+                                            height: 40px;
+                                            border: 2px solid #e9ecef;
+                                            border-radius: 6px;
+                                            cursor: pointer;
+                                        ">
+                                    </div>
+                                    <div class="form-group">
+                                        <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Color 2</label>
+                                        <input type="color" id="changeGradientColor2" value="${eventData.background?.color2 || '#4ECDC4'}" onchange="updateChangeGradientPreview()" style="
+                                            width: 100%;
+                                            height: 40px;
+                                            border: 2px solid #e9ecef;
+                                            border-radius: 6px;
+                                            cursor: pointer;
+                                        ">
+                                    </div>
+                                </div>
+                                <div class="gradient-preview" id="changeGradientPreview" style="
+                                    height: 80px;
+                                    border-radius: 8px;
+                                    border: 1px solid #e9ecef;
+                                "></div>
+                            </div>
+                            
+                            <!-- Media Background -->
+                            <div class="change-bg-content" id="changeMediaContent">
+                                <input type="file" id="changeBackgroundMedia" accept="image/*,video/*,.gif" onchange="handleChangeMediaUpload(this)" style="
+                                    width: 100%;
+                                    padding: 10px;
+                                    border: 2px dashed #e9ecef;
+                                    border-radius: 6px;
+                                    font-size: 14px;
+                                    margin-bottom: 10px;
+                                    color: #333;
+                                    background: white;
+                                ">
+                                <div id="changeMediaPreviewContainer" style="display: none;">
+                                    <div id="changeMediaPreview" style="margin-bottom: 10px;"></div>
+                                    <button type="button" onclick="removeChangeMedia()" style="
+                                        background: #dc3545;
+                                        color: white;
+                                        border: none;
+                                        padding: 6px 12px;
+                                        border-radius: 4px;
+                                        cursor: pointer;
+                                        font-size: 12px;
+                                    ">Remove Media</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tickets Section -->
+                    <div class="section-group" style="margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-ticket-alt" style="color: #f39c12;"></i>
+                            Event Tickets
+                        </h4>
+                        <div id="changeTicketsList">
+                            ${generateChangeTicketsList(eventData.tickets || [])}
+                        </div>
+                    </div>
+                    
+                    <!-- Contact Information Section -->
+                    <div class="section-group" style="margin-bottom: 25px;">
+                        <h4 style="margin: 0 0 15px 0; color: #333; font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-address-book" style="color: #f39c12;"></i>
+                            Contact Information
+                        </h4>
+                        
+                        <div style="background: #f8f9fa; border: 1px solid #e9ecef; border-radius: 8px; padding: 20px;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Host Name</label>
+                                    <input type="text" id="changeHostName" value="${eventData.phyeveContactInfo?.hostName || ''}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Phone Number</label>
+                                    <input type="tel" id="changePhoneNumber" value="${eventData.phyeveContactInfo?.phoneNumber || ''}" placeholder="+234 xxx xxx xxxx" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                            </div>
+                            
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Website</label>
+                                    <input type="url" id="changeWebsiteUrl" value="${eventData.phyeveContactInfo?.websiteUrl || ''}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">Instagram</label>
+                                    <input type="url" id="changeInstagramUrl" value="${eventData.phyeveContactInfo?.instagramUrl || ''}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                  box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                                <div class="form-group">
+                                    <label style="font-weight: 600; color: #333; font-size: 14px; display: block; margin-bottom: 6px;">WhatsApp</label>
+                                    <input type="text" id="changeWhatsappUrl" value="${eventData.phyeveContactInfo?.whatsappUrl || ''}" style="
+                                        width: 100%;
+                                        padding: 10px 12px;
+                                        border: 2px solid #e9ecef;
+                                        border-radius: 6px;
+                                        font-size: 14px;
+                                        box-sizing: border-box;
+                                        color: #333;
+                                        background: white;
+                                    ">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Modal Actions -->
+                    <div class="modal-actions" style="
+                        display: flex;
+                        gap: 12px;
+                        justify-content: flex-end;
+                        padding-top: 20px;
+                        border-top: 2px solid #e9ecef;
+                    ">
+                        <button type="button" onclick="closePhyEventChange()" style="
+                            background: #f8f9fa;
+                            color: #6c757d;
+                            border: 1px solid #e9ecef;
+                            padding: 12px 24px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            transition: all 0.2s ease;
+                        ">Cancel</button>
+                        <button type="button" onclick="submitEventChanges('${eventId}')" style="
+                            background: linear-gradient(135deg, #f39c12, #e67e22);
+                            color: white;
+                            border: none;
+                            padding: 12px 24px;
+                            border-radius: 6px;
+                            cursor: pointer;
+                            font-weight: 600;
+                            transition: all 0.2s ease;
+                            display: flex;
+                            align-items: center;
+                            gap: 8px;
+                        ">
+                            <i class="fas fa-save"></i>
+                            Save Changes
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    `;
+    
+        document.body.appendChild(modal);
+    
+    // Initialize the modal after adding to DOM
+    setTimeout(() => {
+        initializeChangeModal(eventData);
+    }, 100);
+}
+
+// Initialize change modal with event data
+function initializeChangeModal(eventData) {
+    // Set background tab based on existing background
+    if (eventData.background && eventData.background.type === 'media') {
+        switchChangeBackgroundTab('media');
+        
+        // Show existing media if available
+        if (eventData.background.data) {
+            const previewContainer = document.getElementById('changeMediaPreviewContainer');
+            const preview = document.getElementById('changeMediaPreview');
+            
+            if (eventData.background.fileType && eventData.background.fileType.startsWith('image/')) {
+                preview.innerHTML = `<img src="${eventData.background.data}" alt="Current background" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;">`;
+            } else if (eventData.background.fileType && eventData.background.fileType.startsWith('video/')) {
+                preview.innerHTML = `<video src="${eventData.background.data}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" controls muted></video>`;
+            }
+            
+            previewContainer.style.display = 'block';
+        }
+    } else {
+        switchChangeBackgroundTab('gradient');
+    }
+    
+    // Initialize gradient preview
+    updateChangeGradientPreview();
+}
+
+// Toggle TBA schedule in change modal
+function toggleChangeTBASchedule() {
+    const tbaCheckbox = document.getElementById('changeTBASchedule');
+    const dateTimeSection = document.getElementById('changeDateTimeSection');
     
     if (tbaCheckbox.checked) {
         dateTimeSection.style.display = 'none';
         // Clear date/time values
-        document.getElementById('editStartDate').value = '';
-        document.getElementById('editStartTime').value = '';
-        document.getElementById('editEndDate').value = '';
-        document.getElementById('editEndTime').value = '';
+        document.getElementById('changeStartDate').value = '';
+        document.getElementById('changeStartTime').value = '';
+        document.getElementById('changeEndDate').value = '';
+        document.getElementById('changeEndTime').value = '';
     } else {
         dateTimeSection.style.display = 'block';
     }
 }
 
-// Switch background tab in edit mode
-function switchEditBackgroundTab(tabType) {
+// Switch background tab in change modal
+function switchChangeBackgroundTab(tabType) {
     // Update tab buttons
-    document.querySelectorAll('.bg-tab').forEach(tab => tab.classList.remove('active'));
+    document.querySelectorAll('.change-bg-tab').forEach(tab => tab.classList.remove('active'));
     document.querySelector(`[data-tab="${tabType}"]`).classList.add('active');
     
-    // Update content sections
-    document.querySelectorAll('.bg-content').forEach(content => content.classList.remove('active'));
-    document.getElementById(`edit${tabType.charAt(0).toUpperCase() + tabType.slice(1)}Content`).classList.add('active');
+    // Update active tab styling
+    document.querySelectorAll('.change-bg-tab').forEach(tab => {
+        if (tab.getAttribute('data-tab') === tabType) {
+            tab.style.background = '#007bff';
+        } else {
+            tab.style.background = '#6c757d';
+        }
+    });
     
-    updateEditBackgroundPreview();
+    // Update content sections
+    document.querySelectorAll('.change-bg-content').forEach(content => content.classList.remove('active'));
+    document.getElementById(`change${tabType.charAt(0).toUpperCase() + tabType.slice(1)}Content`).classList.add('active');
 }
 
-// Update gradient preview in edit mode
-function updateEditGradientPreview() {
-    const color1 = document.getElementById('editGradientColor1').value;
-    const color2 = document.getElementById('editGradientColor2').value;
-    const preview = document.getElementById('editGradientPreview');
+// Update gradient preview in change modal
+function updateChangeGradientPreview() {
+    const color1 = document.getElementById('changeGradientColor1').value;
+    const color2 = document.getElementById('changeGradientColor2').value;
+    const preview = document.getElementById('changeGradientPreview');
     
     if (preview) {
         preview.style.background = `linear-gradient(135deg, ${color1}, ${color2})`;
     }
-    
-    updateEditBackgroundPreview();
 }
 
-// Update background preview in edit mode
-function updateEditBackgroundPreview() {
-    const backgroundPreview = document.getElementById('editEventBackgroundPreview');
-    const activeTab = document.querySelector('.bg-tab.active');
-    
-    if (!backgroundPreview || !activeTab) return;
-    
-    const tabType = activeTab.getAttribute('data-tab');
-    
-    if (tabType === 'media') {
-        const mediaInput = document.getElementById('editBackgroundMedia');
-        if (mediaInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                backgroundPreview.style.backgroundImage = `url(${e.target.result})`;
-                backgroundPreview.style.backgroundSize = 'cover';
-                backgroundPreview.style.backgroundPosition = 'center';
-            };
-            reader.readAsDataURL(mediaInput.files[0]);
-        }
-    } else {
-        const color1 = document.getElementById('editGradientColor1').value;
-        const color2 = document.getElementById('editGradientColor2').value;
-        backgroundPreview.style.background = `linear-gradient(135deg, ${color1}, ${color2})`;
-    }
-}
-
-// Handle media upload in edit mode
-function handleEditMediaUpload(input) {
+// Handle media upload in change modal
+function handleChangeMediaUpload(input) {
     const file = input.files[0];
     if (!file) return;
     
@@ -44109,195 +44508,113 @@ function handleEditMediaUpload(input) {
     
     const reader = new FileReader();
     reader.onload = function(e) {
-        const previewContainer = document.getElementById('editMediaPreviewContainer');
-        const preview = document.getElementById('editMediaPreview');
+        const previewContainer = document.getElementById('changeMediaPreviewContainer');
+        const preview = document.getElementById('changeMediaPreview');
         
         if (file.type.startsWith('image/')) {
-            preview.innerHTML = `<img src="${e.target.result}" alt="Background preview" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;">`;
+            preview.innerHTML = `<img src="${e.target.result}" alt="Background preview" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;">`;
         } else if (file.type.startsWith('video/')) {
-            preview.innerHTML = `<video src="${e.target.result}" style="width: 100%; height: 200px; object-fit: cover; border-radius: 8px;" controls></video>`;
+            preview.innerHTML = `<video src="${e.target.result}" style="width: 100%; height: 120px; object-fit: cover; border-radius: 8px;" controls muted></video>`;
         }
         
         previewContainer.style.display = 'block';
-        updateEditBackgroundPreview();
+        
+        // Store media data globally
+        window.changeEventMediaData = {
+            type: 'media',
+            data: e.target.result,
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size
+        };
     };
     
     reader.readAsDataURL(file);
 }
 
-// Remove media in edit mode
-function removeEditMedia() {
-    document.getElementById('editBackgroundMedia').value = '';
-    document.getElementById('editMediaPreviewContainer').style.display = 'none';
-    updateEditBackgroundPreview();
+// Remove media in change modal
+function removeChangeMedia() {
+    document.getElementById('changeBackgroundMedia').value = '';
+    document.getElementById('changeMediaPreviewContainer').style.display = 'none';
+    window.changeEventMediaData = null;
 }
 
-// Generate advanced tickets list for editing
-function generateAdvancedEditTicketsList(tickets) {
+// Generate tickets list for change modal
+function generateChangeTicketsList(tickets) {
     if (!tickets || tickets.length === 0) {
-        return '<p class="no-tickets">No tickets available</p>';
+        return '<p style="text-align: center; color: #6c757d; padding: 20px;">No tickets configured</p>';
     }
     
     return tickets.map((ticket, index) => `
-        <div class="advanced-edit-ticket-item" data-index="${index}">
-            <div class="ticket-edit-header">
-                <h5>Ticket ${index + 1}</h5>
-                <button type="button" class="remove-ticket-btn" onclick="removeEditTicket(${index})">
-                    <i class="fas fa-trash"></i>
-                </button>
-            </div>
-            
-            <div class="ticket-edit-content">
-                <div class="ticket-basic-info">
-                    <div class="form-group">
-                        <label>Ticket Name</label>
-                        <input type="text" class="ticket-name-input" value="${ticket.name || ''}" placeholder="Ticket Name" data-index="${index}">
-                    </div>
-                    <div class="form-group">
-                        <label>Price (₦)</label>
-                        <input type="number" class="ticket-price-input" value="${ticket.price || 0}" placeholder="Price" min="0" data-index="${index}">
-                    </div>
-                    <div class="form-group">
-                        <label>Quantity</label>
-                        <input type="number" class="ticket-quantity-input" value="${ticket.quantity || 0}" placeholder="Quantity" min="1" data-index="${index}">
-                    </div>
+        <div class="change-ticket-item" style="
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+        ">
+            <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 10px;">
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; font-size: 12px; display: block; margin-bottom: 4px;">Ticket Name</label>
+                    <input type="text" class="change-ticket-name" value="${ticket.name || ''}" data-index="${index}" style="
+                        width: 100%;
+                        padding: 8px 10px;
+                        border: 1px solid #dee2e6;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        box-sizing: border-box;
+                    ">
                 </div>
-                
-                <div class="ticket-background-section">
-                    <h6>Ticket Background</h6>
-                    <div class="ticket-bg-tabs">
-                        <button type="button" class="ticket-bg-tab active" onclick="switchTicketBackgroundTab(${index}, 'color')" data-tab="color">Color</button>
-                        <button type="button" class="ticket-bg-tab" onclick="switchTicketBackgroundTab(${index}, 'media')" data-tab="media">Media</button>
-                    </div>
-                    
-                    <div class="ticket-bg-content">
-                        <!-- Color Background -->
-                        <div class="ticket-bg-section active" id="ticketColorSection${index}">
-                            <div class="color-input-group">
-                                <label>Ticket Color</label>
-                                <input type="color" class="ticket-color-input" value="${ticket.background?.color || '#4ECDC4'}" data-index="${index}" onchange="updateTicketColorPreview(${index})">
-                            </div>
-                        </div>
-                        
-                        <!-- Media Background -->
-                        <div class="ticket-bg-section" id="ticketMediaSection${index}">
-                            <input type="file" id="ticketMedia${index}" accept="image/*,video/*" class="file-input" onchange="handleTicketMediaUpload(${index}, this)">
-                            <label for="ticketMedia${index}" class="file-label">
-                                <i class="fas fa-upload"></i>
-                                Choose Media
-                            </label>
-                            <div id="ticketMediaPreview${index}" class="ticket-media-preview" style="display: none;"></div>
-                        </div>
-                    </div>
-                    
-                    <!-- Ticket Preview -->
-                    <div class="ticket-preview-container">
-                        <div class="ticket-preview-card" id="ticketPreview${index}">
-                            <div class="ticket-preview-background" style="${generateTicketBackgroundStyle(ticket.background)}">
-                                <div class="ticket-preview-content">
-                                    <h6 class="ticket-preview-name">${ticket.name || 'Ticket Name'}</h6>
-                                    <p class="ticket-preview-price">₦${(ticket.price || 0).toLocaleString()}</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; font-size: 12px; display: block; margin-bottom: 4px;">Price (₦)</label>
+                    <input type="number" class="change-ticket-price" value="${ticket.price || 0}" min="0" data-index="${index}" style="
+                        width: 100%;
+                        padding: 8px 10px;
+                        border: 1px solid #dee2e6;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        box-sizing: border-box;
+                    ">
+                </div>
+                <div class="form-group">
+                    <label style="font-weight: 600; color: #495057; font-size: 12px; display: block; margin-bottom: 4px;">Quantity</label>
+                    <input type="number" class="change-ticket-quantity" value="${ticket.quantity || 0}" min="1" data-index="${index}" style="
+                        width: 100%;
+                        padding: 8px 10px;
+                        border: 1px solid #dee2e6;
+                        border-radius: 4px;
+                        font-size: 13px;
+                        box-sizing: border-box;
+                    ">
                 </div>
             </div>
+            <small style="color: #6c757d; font-size: 11px;">Sold: ${ticket.sold || 0} tickets</small>
         </div>
     `).join('');
 }
 
-// Generate ticket background style
-function generateTicketBackgroundStyle(background) {
-    if (!background) return 'background-color: #4ECDC4;';
+// Submit all changes to Firebase
+async function submitEventChanges(eventId) {
+    const submitBtn = event.target || document.querySelector('[onclick*="submitEventChanges"]');
+    const originalText = submitBtn.innerHTML;
     
-    if (background.type === 'color') {
-        return `background-color: ${background.color};`;
-    } else if (background.type === 'media' && background.data) {
-        return `background-image: url('${background.data}'); background-size: cover; background-position: center;`;
-    }
-    
-    return 'background-color: #4ECDC4;';
-}
-
-// Switch ticket background tab
-function switchTicketBackgroundTab(ticketIndex, tabType) {
-    // Update tab buttons
-    const ticketItem = document.querySelector(`[data-index="${ticketIndex}"]`);
-    ticketItem.querySelectorAll('.ticket-bg-tab').forEach(tab => tab.classList.remove('active'));
-    ticketItem.querySelector(`[data-tab="${tabType}"]`).classList.add('active');
-    
-    // Update content sections
-    ticketItem.querySelectorAll('.ticket-bg-section').forEach(section => section.classList.remove('active'));
-    document.getElementById(`ticket${tabType.charAt(0).toUpperCase() + tabType.slice(1)}Section${ticketIndex}`).classList.add('active');
-}
-
-// Update ticket color preview
-function updateTicketColorPreview(ticketIndex) {
-    const colorInput = document.querySelector(`[data-index="${ticketIndex}"] .ticket-color-input`);
-    const preview = document.getElementById(`ticketPreview${ticketIndex}`);
-    const background = preview.querySelector('.ticket-preview-background');
-    
-    if (colorInput && background) {
-        background.style.backgroundColor = colorInput.value;
-    }
-}
-
-// Handle ticket media upload
-function handleTicketMediaUpload(ticketIndex, input) {
-    const file = input.files[0];
-    if (!file) return;
-    
-    const maxSize = 5 * 1024 * 1024; // 5MB
-    if (file.size > maxSize) {
-        alert('File size must be less than 5MB for ticket backgrounds');
-        input.value = '';
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const preview = document.getElementById(`ticketMediaPreview${ticketIndex}`);
-        const ticketPreview = document.getElementById(`ticketPreview${ticketIndex}`);
-        const background = ticketPreview.querySelector('.ticket-preview-background');
-        
-        if (file.type.startsWith('image/')) {
-            preview.innerHTML = `<img src="${e.target.result}" alt="Ticket background" style="width: 100%; height: 60px; object-fit: cover; border-radius: 4px;">`;
-            background.style.backgroundImage = `url(${e.target.result})`;
-            background.style.backgroundSize = 'cover';
-            background.style.backgroundPosition = 'center';
-        }
-        
-        preview.style.display = 'block';
-    };
-    
-    reader.readAsDataURL(file);
-}
-
-// Remove ticket from edit
-function removeEditTicket(index) {
-    const ticketItem = document.querySelector(`[data-index="${index}"]`);
-    if (ticketItem && confirm('Are you sure you want to remove this ticket?')) {
-        ticketItem.remove();
-    }
-}
-
-// Updated function to save all changes
-async function updateAdvancedPhysicalEvent(eventId) {
     try {
-        const eventName = document.getElementById('editEventName').value.trim();
-        const eventDescription = document.getElementById('editEventDescription').value.trim();
-        const eventLink = document.getElementById('editEventLink').value.trim();
-        const location = document.getElementById('editEventLocation').value.trim();
-        const isTBA = document.getElementById('editTBASchedule').checked;
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Changes...';
+        
+        // Collect all form data
+        const eventName = document.getElementById('changeEventName').value.trim();
+        const eventDescription = document.getElementById('changeEventDescription').value.trim();
+        const eventLink = document.getElementById('changeEventLink').value.trim();
+        const location = document.getElementById('changeEventLocation').value.trim();
+        const isTBA = document.getElementById('changeTBASchedule').checked;
         
         // Validate required fields
-        if (!eventName || !eventLink || !location) {
-            showNotification('Please fill in event name, link and location', 'error');
-            return;
+        if (!eventName || !eventLink || !location || !eventDescription) {
+            throw new Error('Please fill in all required fields');
         }
         
-        // Create updated data object
+        // Prepare update data
         const updateData = {
             eventName: eventName,
             description: eventDescription,
@@ -44313,10 +44630,10 @@ async function updateAdvancedPhysicalEvent(eventId) {
             updateData.isTBA = true;
             updateData.schedulingStatus = 'TBA';
         } else {
-            const startDate = document.getElementById('editStartDate').value;
-            const startTime = document.getElementById('editStartTime').value;
-            const endDate = document.getElementById('editEndDate').value;
-            const endTime = document.getElementById('editEndTime').value;
+            const startDate = document.getElementById('changeStartDate').value;
+            const startTime = document.getElementById('changeStartTime').value;
+            const endDate = document.getElementById('changeEndDate').value;
+            const endTime = document.getElementById('changeEndTime').value;
             
             if (startDate && startTime && endDate && endTime) {
                 updateData.startDateTime = new Date(`${startDate}T${startTime}`).toISOString();
@@ -44326,75 +44643,16 @@ async function updateAdvancedPhysicalEvent(eventId) {
             }
         }
         
-        // Handle Contact Information
-        const contactInfo = {};
-        
-        // Collect all contact fields
-        const hostName = document.getElementById('editHostName').value.trim();
-        const phoneNumber = document.getElementById('editPhoneNumber').value.trim();
-        const websiteUrl = document.getElementById('editWebsiteUrl').value.trim();
-        const instagramUrl = document.getElementById('editInstagramUrl').value.trim();
-        const tiktokUrl = document.getElementById('editTiktokUrl').value.trim();
-        const facebookUrl = document.getElementById('editFacebookUrl').value.trim();
-        const twitterUrl = document.getElementById('editTwitterUrl').value.trim();
-        const youtubeUrl = document.getElementById('editYoutubeUrl').value.trim();
-        const linkedinUrl = document.getElementById('editLinkedinUrl').value.trim();
-        const whatsappUrl = document.getElementById('editWhatsappUrl').value.trim();
-        const customLink1Name = document.getElementById('editCustomLink1Name').value.trim();
-        const customLink1Url = document.getElementById('editCustomLink1Url').value.trim();
-        const customLink2Name = document.getElementById('editCustomLink2Name').value.trim();
-        const customLink2Url = document.getElementById('editCustomLink2Url').value.trim();
-        const customLink3Name = document.getElementById('editCustomLink3Name').value.trim();
-        const customLink3Url = document.getElementById('editCustomLink3Url').value.trim();
-        
-        // Only add non-empty contact information
-        if (hostName) contactInfo.hostName = hostName;
-        if (phoneNumber) contactInfo.phoneNumber = phoneNumber;
-        if (websiteUrl) contactInfo.websiteUrl = websiteUrl;
-        if (instagramUrl) contactInfo.instagramUrl = instagramUrl;
-        if (tiktokUrl) contactInfo.tiktokUrl = tiktokUrl;
-        if (facebookUrl) contactInfo.facebookUrl = facebookUrl;
-        if (twitterUrl) contactInfo.twitterUrl = twitterUrl;
-        if (youtubeUrl) contactInfo.youtubeUrl = youtubeUrl;
-        if (linkedinUrl) contactInfo.linkedinUrl = linkedinUrl;
-        if (whatsappUrl) contactInfo.whatsappUrl = whatsappUrl;
-        if (customLink1Name && customLink1Url) {
-            contactInfo.customLink1Name = customLink1Name;
-            contactInfo.customLink1Url = customLink1Url;
-        }
-        if (customLink2Name && customLink2Url) {
-            contactInfo.customLink2Name = customLink2Name;
-            contactInfo.customLink2Url = customLink2Url;
-        }
-        if (customLink3Name && customLink3Url) {
-            contactInfo.customLink3Name = customLink3Name;
-            contactInfo.customLink3Url = customLink3Url;
-        }
-        
-        // Add contact info to update data (even if empty to clear existing data)
-        if (Object.keys(contactInfo).length > 0) {
-            updateData.phyeveContactInfo = contactInfo;
-        } else {
-            // Explicitly remove contact info if all fields are empty
-            updateData.phyeveContactInfo = firebase.firestore.FieldValue.delete();
-        }
-        
-        console.log('Contact info being saved:', contactInfo);
-        
         // Handle background
-        const activeTab = document.querySelector('.bg-tab.active');
+        const activeTab = document.querySelector('.change-bg-tab.active');
         if (activeTab) {
             const tabType = activeTab.getAttribute('data-tab');
             
-            if (tabType === 'media') {
-                const mediaInput = document.getElementById('editBackgroundMedia');
-                if (mediaInput.files[0]) {
-                    const background = await getEditEventBackground();
-                    updateData.background = background;
-                }
+            if (tabType === 'media' && window.changeEventMediaData) {
+                updateData.background = window.changeEventMediaData;
             } else {
-                const color1 = document.getElementById('editGradientColor1').value;
-                const color2 = document.getElementById('editGradientColor2').value;
+                const color1 = document.getElementById('changeGradientColor1').value;
+                const color2 = document.getElementById('changeGradientColor2').value;
                 updateData.background = {
                     type: 'gradient',
                     color1: color1,
@@ -44404,274 +44662,119 @@ async function updateAdvancedPhysicalEvent(eventId) {
             }
         }
         
-        // Handle tickets
-        const updatedTickets = [];
-        const ticketItems = document.querySelectorAll('.advanced-edit-ticket-item');
-        
-        for (let i = 0; i < ticketItems.length; i++) {
-            const item = ticketItems[i];
-            const nameInput = item.querySelector('.ticket-name-input');
-            const priceInput = item.querySelector('.ticket-price-input');
-            const quantityInput = item.querySelector('.ticket-quantity-input');
-            const colorInput = item.querySelector('.ticket-color-input');
-            
-            if (nameInput && priceInput && quantityInput) {
-                let ticketBackground = {
-                    type: 'color',
-                    color: colorInput.value
-                };
-                
-                // Check if media was uploaded
-                const mediaInput = document.getElementById(`ticketMedia${i}`);
-                if (mediaInput && mediaInput.files[0]) {
-                    const ticketMediaBackground = await processTicketMediaFile(mediaInput.files[0]);
-                    ticketBackground = ticketMediaBackground;
-                }
-                
-                const ticketData = {
-                    id: `ticket_${Date.now()}_${i}`,
-                    name: nameInput.value,
-                    price: parseFloat(priceInput.value) || 0,
-                    quantity: parseInt(quantityInput.value) || 0,
-                    sold: 0,
-                    background: ticketBackground,
-                    type: parseFloat(priceInput.value) > 0 ? 'paid' : 'free',
-                    status: isTBA ? 'Coming Soon' : (parseFloat(priceInput.value) > 0 ? `Paid Ticket - ₦${parseFloat(priceInput.value).toLocaleString()}` : 'Free Ticket'),
-                    available: !isTBA,
-                    createdAt: new Date().toISOString()
-                };
-                
-                updatedTickets.push(ticketData);
-            }
+        // Handle contact information
+        const contactInfo = collectChangeContactInfo();
+        if (contactInfo && Object.keys(contactInfo).length > 0) {
+            updateData.phyeveContactInfo = contactInfo;
         }
         
+        // Handle tickets
+        const updatedTickets = collectChangeTicketsInfo();
         if (updatedTickets.length > 0) {
             updateData.tickets = updatedTickets;
         }
         
-        console.log('Update data:', updateData);
+        console.log('Submitting changes:', updateData);
         
         // Update in Firebase
         const db = firebase.firestore();
         await db.collection('physicalEvents').doc(eventId).update(updateData);
         
-        // FIXED: Close modal BEFORE showing notification
-        closePhyEventEdit();
+        // Close modal and show success
+        closePhyEventChange();
         
-        // Small delay to ensure modal is closed before showing notification
         setTimeout(() => {
-            showNotification('Event updated successfully!', 'success');
+            showToast('Event changes saved successfully!', 'success');
             loadUserPhysicalEvents(); // Refresh the display
         }, 100);
         
-        closePhyEventEdit();
-        loadUserPhysicalEvents(); // Refresh the display
-        showNotification('Event updated successfully!', 'success');
-        
-   } catch (error) {
-        console.error('Error updating event:', error);
-        // Close modal even on error
-        closePhyEventEdit();
-        setTimeout(() => {
-            showNotification('Error updating event: ' + error.message, 'error');
-        }, 100);
+    } catch (error) {
+        console.error('Error saving changes:', error);
+        showToast('Error saving changes: ' + error.message, 'error');
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
     }
 }
 
-
-// Helper function to collect contact information from edit form
-function collectEditContactInformation() {
-    const contactInfo = {};
-    
-    // Collect all contact fields from edit form
+// Collect contact information from change form
+function collectChangeContactInfo() {
     const contactFields = {
-        hostName: document.getElementById('editHostName'),
-        phoneNumber: document.getElementById('editPhoneNumber'),
-        websiteUrl: document.getElementById('editWebsiteUrl'),
-        instagramUrl: document.getElementById('editInstagramUrl'),
-        tiktokUrl: document.getElementById('editTiktokUrl'),
-        facebookUrl: document.getElementById('editFacebookUrl'),
-        twitterUrl: document.getElementById('editTwitterUrl'),
-        youtubeUrl: document.getElementById('editYoutubeUrl'),
-        linkedinUrl: document.getElementById('editLinkedinUrl'),
-        whatsappUrl: document.getElementById('editWhatsappUrl'),
-        customLink1Name: document.getElementById('editCustomLink1Name'),
-        customLink1Url: document.getElementById('editCustomLink1Url'),
-        customLink2Name: document.getElementById('editCustomLink2Name'),
-        customLink2Url: document.getElementById('editCustomLink2Url'),
-        customLink3Name: document.getElementById('editCustomLink3Name'),
-        customLink3Url: document.getElementById('editCustomLink3Url')
+        hostName: document.getElementById('changeHostName').value.trim(),
+        phoneNumber: document.getElementById('changePhoneNumber').value.trim(),
+        websiteUrl: document.getElementById('changeWebsiteUrl').value.trim(),
+        instagramUrl: document.getElementById('changeInstagramUrl').value.trim(),
+        whatsappUrl: document.getElementById('changeWhatsappUrl').value.trim()
     };
     
-    // Only add non-empty values
+    // Only include non-empty values
+    const contactInfo = {};
     Object.keys(contactFields).forEach(key => {
-        const element = contactFields[key];
-        if (element && element.value.trim()) {
-            contactInfo[key] = element.value.trim();
+        if (contactFields[key]) {
+            contactInfo[key] = contactFields[key];
         }
     });
     
-    console.log('Collected contact info:', contactInfo);
-    return Object.keys(contactInfo).length > 0 ? contactInfo : null;
+    return contactInfo;
 }
 
-// Enhanced validation for contact information
-function validateContactInformation(contactInfo) {
-    const errors = [];
+// Collect tickets information from change form
+function collectChangeTicketsInfo() {
+    const ticketInputs = document.querySelectorAll('.change-ticket-item');
+    const updatedTickets = [];
     
-    if (contactInfo) {
-        // Validate URLs
-        const urlFields = [
-            'websiteUrl', 'instagramUrl', 'tiktokUrl', 'facebookUrl', 
-            'twitterUrl', 'youtubeUrl', 'linkedinUrl', 'whatsappUrl',
-            'customLink1Url', 'customLink2Url', 'customLink3Url'
-        ];
+    ticketInputs.forEach((ticketItem, index) => {
+        const nameInput = ticketItem.querySelector('.change-ticket-name');
+        const priceInput = ticketItem.querySelector('.change-ticket-price');
+        const quantityInput = ticketItem.querySelector('.change-ticket-quantity');
         
-        urlFields.forEach(field => {
-            if (contactInfo[field]) {
-                try {
-                    new URL(contactInfo[field]);
-                } catch (error) {
-                    errors.push(`Invalid URL format for ${field.replace('Url', '')}`);
-                }
+        if (nameInput && priceInput && quantityInput) {
+            const name = nameInput.value.trim();
+            const price = parseFloat(priceInput.value) || 0;
+            const quantity = parseInt(quantityInput.value) || 0;
+            
+            if (name && quantity > 0) {
+                updatedTickets.push({
+                    id: `ticket_${Date.now()}_${index}`,
+                    name: name,
+                    price: price,
+                    quantity: quantity,
+                    sold: 0, // Preserve sold count from original if needed
+                    type: price > 0 ? 'paid' : 'free',
+                    status: price > 0 ? `Paid Ticket - ₦${price.toLocaleString()}` : 'Free Ticket',
+                    available: true,
+                    background: {
+                        type: 'color',
+                        color: '#4ECDC4'
+                    },
+                    createdAt: new Date().toISOString()
+                });
             }
-        });
-        
-        // Validate phone number format
-        if (contactInfo.phoneNumber) {
-            const phonePattern = /^(\+\d{1,3}[- ]?)?\d{10,14}$/;
-            if (!phonePattern.test(contactInfo.phoneNumber.replace(/\s/g, ''))) {
-                errors.push('Invalid phone number format. Use international format like +234 xxx xxx xxxx');
-            }
         }
-        
-        // Validate custom links have both name and URL
-        if (contactInfo.customLink1Name && !contactInfo.customLink1Url) {
-            errors.push('Custom Link 1 URL is required when name is provided');
-        }
-        if (contactInfo.customLink1Url && !contactInfo.customLink1Name) {
-            errors.push('Custom Link 1 Name is required when URL is provided');
-        }
-        
-        if (contactInfo.customLink2Name && !contactInfo.customLink2Url) {
-            errors.push('Custom Link 2 URL is required when name is provided');
-        }
-        if (contactInfo.customLink2Url && !contactInfo.customLink2Name) {
-            errors.push('Custom Link 2 Name is required when URL is provided');
-        }
-        
-        if (contactInfo.customLink3Name && !contactInfo.customLink3Url) {
-            errors.push('Custom Link 3 URL is required when name is provided');
-        }
-        if (contactInfo.customLink3Url && !contactInfo.customLink3Name) {
-            errors.push('Custom Link 3 Name is required when URL is provided');
-        }
-    }
-   
-    return {
-        isValid: errors.length === 0,
-        errors: errors
-    };
-} 
-// Fixed close function
-function closePhyEventEdit() {
-    const modal = document.getElementById('phyeventedit-modal');
+    });
+    
+    return updatedTickets;
+}
+
+// Close change modal
+function closePhyEventChange() {
+    const modal = document.getElementById('phyeventchange-modal');
     if (modal) {
         modal.remove();
     }
-    // Also remove any other edit modals that might exist
-    const allEditModals = document.querySelectorAll('.phyeventedit-modal-overlay');
-    allEditModals.forEach(modal => modal.remove());
+    
+    // Clear stored media data
+    window.changeEventMediaData = null;
 }
 
-function closePhyEventClose() {
-    const modal = document.getElementById('phyeventclose-modal');
-    if (modal) {
-        modal.remove();
-    }
-    // Also remove any other close modals that might exist
-    const allCloseModals = document.querySelectorAll('.phyeventclose-modal-overlay');
-    allCloseModals.forEach(modal => modal.remove());
-}
-
-// Fixed confirm close function
-async function confirmCloseEvent(eventId) {
-    try {
-        const db = firebase.firestore();
-        
-        await db.collection('physicalEvents').doc(eventId).update({
-            closedevent: 'yes',
-            status: 'closed',
-            closedAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
-        });
-        
-        // FIXED: Close modal BEFORE showing notification
-        closePhyEventClose();
-        
-        setTimeout(() => {
-            showNotification('Event closed successfully!', 'success');
-            loadUserPhysicalEvents();
-        }, 100);
-        
-    } catch (error) {
-        console.error('Error closing event:', error);
-        closePhyEventClose();
-        setTimeout(() => {
-            showNotification('Error closing event: ' + error.message, 'error');
-        }, 100);
-    }
-}
-// Add this to handle clicking outside modal to close
+// Close modal when clicking outside
 document.addEventListener('click', function(event) {
-    // Close edit modal if clicking outside
-    if (event.target.classList.contains('phyeventedit-modal-overlay')) {
-        closePhyEventEdit();
-    }
-    
-    // Close close-event modal if clicking outside
-    if (event.target.classList.contains('phyeventclose-modal-overlay')) {
-        closePhyEventClose();
+    if (event.target.classList.contains('phyeventchange-modal-overlay')) {
+        closePhyEventChange();
     }
 });
-// Helper function to get edit event background
-async function getEditEventBackground() {
-    const mediaInput = document.getElementById('editBackgroundMedia');
-    if (mediaInput.files[0]) {
-        const file = mediaInput.files[0];
-        
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                resolve({
-                    type: 'media',
-                    data: e.target.result,
-                    fileName: file.name,
-                    fileType: file.type
-                });
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-    
-    return null;
-}
 
-// Helper function to process ticket media file
-function processTicketMediaFile(file) {
-    return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            resolve({
-                type: 'media',
-                data: e.target.result,
-                fileName: file.name,
-                fileType: file.type
-            });
-        };
-        reader.readAsDataURL(file);
-    });
-}
+        
 // ========================================
 // SEARCH AND FILTER FUNCTIONALITY
 // ========================================
@@ -44692,126 +44795,138 @@ function createSearchFilterControls() {
     
     controlsContainer.innerHTML = `
         <div style="
-            background: #f8f9fa;
-            padding: 16px;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            border: 1px solid #e9ecef;
-        ">
-            <div style="
-                display: grid;
-                grid-template-columns: 1fr auto auto;
-                gap: 12px;
-                align-items: center;
-            ">
-                <!-- Search Input -->
-                <div style="position: relative;">
-                    <input type="text" 
-                           id="eventSearchInput" 
-                           placeholder="Search events by name..." 
-                           style="
-                               width: 100%;
-                               padding: 10px 12px 10px 40px;
-                               border: 2px solid #dee2e6;
-                               border-radius: 6px;
-                               font-size: 14px;
-                               transition: border-color 0.2s ease;
-                               box-sizing: border-box;
-                           "
-                           onkeyup="handleEventSearch()"
-                           onfocus="this.style.borderColor='#007bff'"
-                           onblur="this.style.borderColor='#dee2e6'">
-                    <i class="fas fa-search" style="
-                        position: absolute;
-                        left: 12px;
-                        top: 50%;
-                        transform: translateY(-50%);
-                        color: #6c757d;
-                        font-size: 14px;
-                    "></i>
-                </div>
-                
-                <!-- Month Filter -->
-                <select id="monthFilter" 
-                        onchange="handleEventFilter()"
-                        style="
-                            padding: 10px 12px;
-                            border: 2px solid #dee2e6;
-                            border-radius: 6px;
-                            font-size: 14px;
-                            background: white;
-                            cursor: pointer;
-                            min-width: 120px;
-                        ">
-                    <option value="">All Months</option>
-                    <option value="01">January</option>
-                    <option value="02">February</option>
-                    <option value="03">March</option>
-                    <option value="04">April</option>
-                    <option value="05">May</option>
-                    <option value="06">June</option>
-                    <option value="07">July</option>
-                    <option value="08">August</option>
-                    <option value="09">September</option>
-                    <option value="10">October</option>
-                    <option value="11">November</option>
-                    <option value="12">December</option>
-                </select>
-                
-                <!-- Date Filter -->
-                <input type="date" 
-                       id="dateFilter" 
-                       onchange="handleEventFilter()"
-                       style="
-                           padding: 10px 12px;
-                           border: 2px solid #dee2e6;
-                           border-radius: 6px;
-                           font-size: 14px;
-                           background: white;
-                           cursor: pointer;
-                           min-width: 150px;
-                       ">
-            </div>
-            
-            <!-- Clear Filters Button -->
-            <div style="margin-top: 12px; text-align: right;">
-                <button onclick="clearAllFilters()" 
-                        style="
-                            padding: 6px 12px;
-                            background: #6c757d;
-                            color: white;
-                            border: none;
-                            border-radius: 4px;
-                            font-size: 12px;
-                            cursor: pointer;
-                            transition: background 0.2s ease;
-                        "
-                        onmouseover="this.style.background='#5a6268'"
-                        onmouseout="this.style.background='#6c757d'">
-                    <i class="fas fa-times"></i> Clear Filters
-                </button>
-            </div>
+    background: #f8f9fa;
+    padding: 12px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    border: 1px solid #e9ecef;
+">
+    <div style="
+        display: grid;
+        grid-template-columns: 1fr auto auto;
+        gap: 8px;
+        align-items: center;
+    " class="search-filter-grid">
+        <!-- Search Input -->
+        <div style="position: relative; grid-column: 1 / -1;" class="search-input-container">
+            <input type="text" 
+                   id="eventSearchInput" 
+                   placeholder="Search events by name..." 
+                   style="
+                       width: 100%;
+                       padding: 12px 16px 12px 44px;
+                       border: 2px solid #dee2e6;
+                       border-radius: 8px;
+                       font-size: 16px;
+                       transition: border-color 0.2s ease;
+                       box-sizing: border-box;
+                       -webkit-appearance: none;
+                       appearance: none;
+                   "
+                   onkeyup="handleEventSearch()"
+                   onfocus="this.style.borderColor='#007bff'"
+                   onblur="this.style.borderColor='#dee2e6'">
+            <i class="fas fa-search" style="
+                position: absolute;
+                left: 16px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: #6c757d;
+                font-size: 16px;
+            "></i>
         </div>
-    `;
+        
+        <!-- Filter Row -->
+        <div style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+            grid-column: 1 / -1;
+            margin-top: 8px;
+        " class="filter-row">
+            <!-- Month Filter -->
+            <select id="monthFilter" 
+                    onchange="handleEventFilter()"
+                    style="
+                        padding: 12px 16px;
+                        border: 2px solid #dee2e6;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        background: white;
+                        cursor: pointer;
+                        width: 100%;
+                        box-sizing: border-box;
+                        -webkit-appearance: none;
+                        appearance: none;
+                        background-image: url('data:image/svg+xml;charset=US-ASCII,<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 4 5\"><path fill=\"%23666\" d=\"M2 0L0 2h4zm0 5L0 3h4z\"/></svg>');
+                        background-repeat: no-repeat;
+                        background-position: right 12px center;
+                        background-size: 12px;
+                        padding-right: 32px;
+                    ">
+                <option value="">All Months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+            </select>
+            
+            <!-- Date Filter -->
+            <input type="date" 
+                   id="dateFilter" 
+                   onchange="handleEventFilter()"
+                   style="
+                       padding: 12px 16px;
+                       border: 2px solid #dee2e6;
+                       border-radius: 8px;
+                       font-size: 16px;
+                       background: white;
+                       cursor: pointer;
+                       width: 100%;
+                       box-sizing: border-box;
+                       -webkit-appearance: none;
+                       appearance: none;
+                   ">
+        </div>
+    </div>
+    
+    <!-- Clear Filters Button -->
+    <div style="margin-top: 12px; text-align: center;">
+        <button onclick="clearAllFilters()" 
+                style="
+                    padding: 10px 20px;
+                    background: #6c757d;
+                    color: white;
+                    border: none;
+                    border-radius: 6px;
+                    font-size: 14px;
+                    cursor: pointer;
+                    transition: background 0.2s ease;
+                    min-height: 44px;
+                    min-width: 120px;
+                    touch-action: manipulation;
+                "
+                onmouseover="this.style.background='#5a6268'"
+                onmouseout="this.style.background='#6c757d'">
+            <i class="fas fa-times"></i> Clear Filters
+        </button>
+    </div>
+</div>
+ `;
 }
 
-// Handle event search
-function handleEventSearch() {
-    const searchTerm = document.getElementById('eventSearchInput').value.toLowerCase().trim();
-    const monthFilter = document.getElementById('monthFilter').value;
-    const dateFilter = document.getElementById('dateFilter').value;
-    
-    filterAndDisplayEvents(searchTerm, monthFilter, dateFilter);
-}
 
-// Handle event filter
-function handleEventFilter() {
-    const searchTerm = document.getElementById('eventSearchInput').value.toLowerCase().trim();
-    const monthFilter = document.getElementById('monthFilter').value;
-    const dateFilter = document.getElementById('dateFilter').value;
-    
-    filterAndDisplayEvents(searchTerm, monthFilter, dateFilter);
-}
+
+
 
 // Filter and display events
 function filterAndDisplayEvents(searchTerm = '', monthFilter = '', dateFilter = '') {
@@ -50971,7 +51086,10 @@ async function loadNewEventTickets() {
                 </div>
             `;
             return;
-        } // Generate ticket cards
+        } 
+        
+        
+        // Generate ticket cards
         const ticketCardsHTML = validTickets.map(ticket => generateNewPhyEventTicketCard(ticket)).join('');
         container.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -62189,7 +62307,92 @@ document.addEventListener('DOMContentLoaded', function() {
     opacity: 0 !important;
     visibility: hidden !important;
     pointer-events: none !important;
+
+
 }
+
+
+.advanced-tba-badge {
+    position: absolute;
+    top: 50px;
+    left: 10px;
+    background: rgba(255, 193, 7, 0.9);
+    color: #000;
+    padding: 4px 8px;
+    border-radius: 15px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    backdrop-filter: blur(4px);
+    z-index: 3;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tba-datetime .advanced-detail-item {
+    background: rgba(255, 215, 0, 0.1);
+    padding: 4px 8px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+}
+
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .search-filter-grid {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+    }
+    
+    .search-input-container {
+        grid-column: 1 / -1 !important;
+    }
+    
+    .filter-row {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        margin-top: 12px !important;
+    }
+    
+    #eventSearchInput {
+        font-size: 16px !important;
+        padding: 14px 18px 14px 48px !important;
+    }
+    
+    #monthFilter, #dateFilter {
+        font-size: 16px !important;
+        padding: 14px 18px !important;
+        min-height: 48px !important;
+    }
+    
+    .fas.fa-search {
+        left: 18px !important;
+        font-size: 18px !important;
+    }
+}
+
+@media (max-width: 480px) {
+    .search-filter-grid {
+        padding: 8px !important;
+    }
+    
+    #eventSearchInput {
+        padding: 16px 20px 16px 52px !important;
+        font-size: 16px !important;
+    }
+    
+    #monthFilter, #dateFilter {
+        padding: 16px 20px !important;
+        font-size: 16px !important;
+        min-height: 52px !important;
+    }
+    
+    .fas.fa-search {
+        left: 20px !important;
+        font-size: 20px !important;
+    }
+}
+
 }
 </style>
 
