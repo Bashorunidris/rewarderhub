@@ -49514,10 +49514,10 @@ class ValidationAudio {
 const validationAudio = new ValidationAudio();
 
 // Global variables for session management
-let currentValidationEventId = null;
-let validationSessionStart = null;
-let validationSessionDuration = 30 * 60 * 1000; // 30 minutes
 
+var currentValidationEventId = null;
+var validationSessionStart = null;
+var validationSessionDuration = 30 * 60 * 1000; // 30 minutes
 function openTicketInputScanner() {
     closeValidatorOptionsModal();
     
@@ -62398,4 +62398,3 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
-
