@@ -22217,11 +22217,7 @@ tba-option {
 
         <div class="wallet1-btn">
           
-         <div class="walleticon-btn">
-                    <i class="fas fa-wallet"></i>
-                 </div>
-               
-            </div>
+       
              
        
     </div>
@@ -26196,7 +26192,7 @@ tba-option {
         </div>
     </div>
 </div>
-<!-- Awards Modal (Complete) -->
+!-- Awards Modal (Complete) -->
 <div id="awardsModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10001; justify-content: center; align-items: center; overflow-y: auto;">
     <div class="awards-modal-content" style="
         background: white;
@@ -41740,10 +41736,7 @@ ${eventData.phyeveContactInfo ? `
             <div class="sponsors-section">
                 <div class="sponsors-header">
                     <h4>Event Sponsors</h4>
-                    <button class="add-sponsors-btn" onclick="openSponsorsModal('${eventData.physicalEventId}')">
-                        <i class="fas fa-plus"></i>
-                        Add Sponsors
-                    </button>
+                  
                 </div>
                 <div class="sponsors-display">
                     ${generateSponsorsDisplay(eventData.sponsors)}
@@ -41751,65 +41744,12 @@ ${eventData.phyeveContactInfo ? `
             </div>
            
             <div class="event-action-buttons" style="display: flex; gap: 8px; margin-top: 12px;">
-                <button class="setup-bank-btn" 
-                        onclick="openBankSetupForm('${eventData.physicalEventId}')"
-                        title="Setup Bank Details for Withdrawals"
-                        style="
-                            background: linear-gradient(135deg, #007bff, #0056b3);
-                            color: white;
-                            border: none;
-                            padding: 8px 12px;
-                            border-radius: 6px;
-                            cursor: pointer;
-                            font-weight: 600;
-                            transition: all 0.3s ease;
-                            display: flex;
-                            align-items: center;
-                            gap: 6px;
-                            font-size: 13px;
-                            flex: 1;
-                        ">
-                    <i class="fas fa-university"></i>
-                    Setup Bank
-                </button>
                 
-                ${!hasNoTickets ? `
-                    <button class="withdraw-pee-btn" 
-                            onclick="openWithdrawPEEForm('${eventData.physicalEventId}', '${eventData.eventName}', ${totalRevenue})"
-                            title="Withdraw Physical Event Earnings"
-                            style="
-                                background: linear-gradient(135deg, #28a745, #20c997);
-                                color: white;
-                                border: none;
-                                padding: 8px 12px;
-                                border-radius: 6px;
-                                cursor: pointer;
-                                font-weight: 600;
-                                transition: all 0.3s ease;
-                                display: flex;
-                                align-items: center;
-                                gap: 6px;
-                                font-size: 13px;
-                                flex: 1;
-                            ">
-                        <i class="fas fa-money-bill-wave"></i>
-                        Withdraw PEE
-                    </button>
-                ` : ''}
-
-                <button onclick="openWithdrawalHistory()" style="
-                    background: #6c5ce7;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    cursor: pointer;
-                    font-size: 14px;
-                    font-weight: 600;
-                    margin: 10px 0;
-                ">
-                    <i class="fas fa-history"></i> View Withdrawal History
-                </button>
+                  <h4>We are updating the withdrawal feature to better suit u 
+                    sunday 24th we will get back 
+                  </h4>
+                  
+                
             </div>
         </div>
     `;
@@ -44454,6 +44394,9 @@ function createChangeEventModal(eventId, eventData) {
 
 // Initialize change modal with event data
 function initializeChangeModal(eventData) {
+    // Initialize event listeners first
+    initializeChangeEventListeners();
+    
     // Set background tab based on existing background
     if (eventData.background && eventData.background.type === 'media') {
         switchChangeBackgroundTab('media');
@@ -44498,9 +44441,24 @@ function toggleChangeTBASchedule() {
 
 // Switch background tab in change modal
 function switchChangeBackgroundTab(tabType) {
-    // Update tab buttons
-    document.querySelectorAll('.change-bg-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelector(`[data-tab="${tabType}"]`).classList.add('active');
+    console.log('Switching change tab to:', tabType);
+    
+    // Store the current tab type globally
+    window.currentChangeBgTab = tabType;
+    
+    // Update tab buttons - remove active from all first
+    document.querySelectorAll('.change-bg-tab').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
+    // Add active class to the correct tab
+    const targetTab = document.querySelector(`.change-bg-tab[data-tab="${tabType}"]`);
+    if (targetTab) {
+        targetTab.classList.add('active');
+        console.log('Tab activated:', tabType);
+    } else {
+        console.error('Target tab not found:', tabType);
+    }
     
     // Update active tab styling
     document.querySelectorAll('.change-bg-tab').forEach(tab => {
@@ -44513,7 +44471,17 @@ function switchChangeBackgroundTab(tabType) {
     
     // Update content sections
     document.querySelectorAll('.change-bg-content').forEach(content => content.classList.remove('active'));
-    document.getElementById(`change${tabType.charAt(0).toUpperCase() + tabType.slice(1)}Content`).classList.add('active');
+    const contentElement = document.getElementById(`change${tabType.charAt(0).toUpperCase() + tabType.slice(1)}Content`);
+    
+    if (contentElement) {
+        contentElement.classList.add('active');
+        console.log('Content section activated:', tabType);
+    } else {
+        console.error('Content section not found:', tabType);
+    }
+    
+    // Update main preview if it exists
+    updateChangeEventPreview();
 }
 
 // Update gradient preview in change modal
@@ -44530,7 +44498,12 @@ function updateChangeGradientPreview() {
 // Handle media upload in change modal
 function handleChangeMediaUpload(input) {
     const file = input.files[0];
-    if (!file) return;
+    if (!file) {
+        console.log('No file selected');
+        return;
+    }
+    
+    console.log('Media upload started for change:', file.name, file.type, file.size);
     
     // Validate file
     const maxSize = 10 * 1024 * 1024; // 10MB
@@ -44540,8 +44513,20 @@ function handleChangeMediaUpload(input) {
         return;
     }
     
+    // Validate file type
+    const validTypes = ['image/', 'video/'];
+    const isValidType = validTypes.some(type => file.type.startsWith(type));
+    
+    if (!isValidType) {
+        alert('Please select an image or video file');
+        input.value = '';
+        return;
+    }
+    
     const reader = new FileReader();
     reader.onload = function(e) {
+        console.log('File loaded successfully for change, data length:', e.target.result.length);
+        
         const previewContainer = document.getElementById('changeMediaPreviewContainer');
         const preview = document.getElementById('changeMediaPreview');
         
@@ -44561,6 +44546,17 @@ function handleChangeMediaUpload(input) {
             fileType: file.type,
             fileSize: file.size
         };
+        
+        // Ensure we're on the media tab and mark it as active
+        switchChangeBackgroundTab('media');
+        
+        console.log('Media stored for change:', window.changeEventMediaData.fileName);
+    };
+    
+    reader.onerror = function(error) {
+        console.error('File reading error:', error);
+        alert('Error reading file. Please try again.');
+        input.value = '';
     };
     
     reader.readAsDataURL(file);
@@ -44568,9 +44564,27 @@ function handleChangeMediaUpload(input) {
 
 // Remove media in change modal
 function removeChangeMedia() {
-    document.getElementById('changeBackgroundMedia').value = '';
-    document.getElementById('changeMediaPreviewContainer').style.display = 'none';
+    console.log('Removing change media');
+    
+    // Clear the file input
+    const mediaInput = document.getElementById('changeBackgroundMedia');
+    if (mediaInput) {
+        mediaInput.value = '';
+    }
+    
+    // Hide preview container
+    const previewContainer = document.getElementById('changeMediaPreviewContainer');
+    if (previewContainer) {
+        previewContainer.style.display = 'none';
+    }
+    
+    // Clear stored media data
     window.changeEventMediaData = null;
+    
+    // Switch to gradient tab
+    switchChangeBackgroundTab('gradient');
+    
+    console.log('Change media removed');
 }
 
 // Generate tickets list for change modal
@@ -44636,6 +44650,9 @@ async function submitEventChanges(eventId) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving Changes...';
         
+        console.log('=== SUBMITTING EVENT CHANGES ===');
+        console.log('Event ID:', eventId);
+        
         // Collect all form data
         const eventName = document.getElementById('changeEventName').value.trim();
         const eventDescription = document.getElementById('changeEventDescription').value.trim();
@@ -44677,22 +44694,47 @@ async function submitEventChanges(eventId) {
             }
         }
         
-        // Handle background
-        const activeTab = document.querySelector('.change-bg-tab.active');
-        if (activeTab) {
-            const tabType = activeTab.getAttribute('data-tab');
+        // Handle background - FIXED VERSION
+        console.log('Checking background changes...');
+        console.log('Current change tab:', window.currentChangeBgTab);
+        console.log('Change media data available:', !!window.changeEventMediaData);
+        
+        // Check multiple ways to determine if media tab is active
+        const activeTabElement = document.querySelector('.change-bg-tab.active');
+        const isMediaTabActive = activeTabElement && activeTabElement.getAttribute('data-tab') === 'media';
+        const isMediaTabByGlobal = window.currentChangeBgTab === 'media';
+        
+        console.log('Active tab element:', activeTabElement);
+        console.log('Is media tab active (element):', isMediaTabActive);
+        console.log('Is media tab active (global):', isMediaTabByGlobal);
+        
+        if ((isMediaTabActive || isMediaTabByGlobal) && window.changeEventMediaData) {
+            console.log('Updating with new media:', window.changeEventMediaData.fileName);
+            updateData.background = {
+                type: 'media',
+                data: window.changeEventMediaData.data,
+                fileName: window.changeEventMediaData.fileName,
+                fileType: window.changeEventMediaData.fileType,
+                fileSize: window.changeEventMediaData.fileSize
+            };
+        } else {
+            // Use gradient or keep existing
+            const color1Element = document.getElementById('changeGradientColor1');
+            const color2Element = document.getElementById('changeGradientColor2');
             
-            if (tabType === 'media' && window.changeEventMediaData) {
-                updateData.background = window.changeEventMediaData;
-            } else {
-                const color1 = document.getElementById('changeGradientColor1').value;
-                const color2 = document.getElementById('changeGradientColor2').value;
+            if (color1Element && color2Element) {
+                const color1 = color1Element.value || '#FF6B6B';
+                const color2 = color2Element.value || '#4ECDC4';
+                
+                console.log('Updating with gradient:', color1, color2);
                 updateData.background = {
                     type: 'gradient',
                     color1: color1,
                     color2: color2,
                     gradient: `linear-gradient(135deg, ${color1}, ${color2})`
                 };
+            } else {
+                console.log('No background changes detected, keeping existing');
             }
         }
         
@@ -44708,11 +44750,15 @@ async function submitEventChanges(eventId) {
             updateData.tickets = updatedTickets;
         }
         
-        console.log('Submitting changes:', updateData);
+        console.log('Final update data:', updateData);
         
         // Update in Firebase
         const db = firebase.firestore();
         await db.collection('physicalEvents').doc(eventId).update(updateData);
+        
+        // Clear the global media data after successful save
+        window.changeEventMediaData = null;
+        window.currentChangeBgTab = null;
         
         // Close modal and show success
         closePhyEventChange();
@@ -44728,6 +44774,65 @@ async function submitEventChanges(eventId) {
     } finally {
         submitBtn.disabled = false;
         submitBtn.innerHTML = originalText;
+    }
+}
+
+// Function to update change event preview (optional)
+function updateChangeEventPreview() {
+    const eventNameElement = document.getElementById('changeEventName');
+    const previewTitle = document.getElementById('changePreviewEventTitle');
+    
+    if (eventNameElement && previewTitle) {
+        previewTitle.textContent = eventNameElement.value || 'Event Name';
+    }
+    
+    // Update background preview if exists
+    const backgroundPreview = document.getElementById('changeEventBackgroundPreview');
+    if (backgroundPreview) {
+        if (window.changeEventMediaData) {
+            // Show media background
+            backgroundPreview.style.backgroundImage = `url(${window.changeEventMediaData.data})`;
+            backgroundPreview.style.backgroundSize = 'cover';
+            backgroundPreview.style.backgroundPosition = 'center';
+            backgroundPreview.style.background = '';
+        } else {
+            // Show gradient background
+            const color1Element = document.getElementById('changeGradientColor1');
+            const color2Element = document.getElementById('changeGradientColor2');
+            
+            if (color1Element && color2Element) {
+                const color1 = color1Element.value || '#FF6B6B';
+                const color2 = color2Element.value || '#4ECDC4';
+                backgroundPreview.style.background = `linear-gradient(135deg, ${color1}, ${color2})`;
+                backgroundPreview.style.backgroundImage = '';
+            }
+        }
+    }
+}
+
+// Initialize change event listeners (call this when opening edit modal)
+function initializeChangeEventListeners() {
+    console.log('Initializing change event listeners');
+    
+    // Clear any existing media data
+    window.changeEventMediaData = null;
+    window.currentChangeBgTab = 'gradient'; // Default to gradient tab
+    
+    // Add event listeners for real-time updates
+    const eventNameInput = document.getElementById('changeEventName');
+    if (eventNameInput) {
+        eventNameInput.addEventListener('input', updateChangeEventPreview);
+    }
+    
+    // Add gradient color change listeners
+    const gradientColor1 = document.getElementById('changeGradientColor1');
+    const gradientColor2 = document.getElementById('changeGradientColor2');
+    
+    if (gradientColor1) {
+        gradientColor1.addEventListener('change', updateChangeEventPreview);
+    }
+    if (gradientColor2) {
+        gradientColor2.addEventListener('change', updateChangeEventPreview);
     }
 }
 
@@ -47956,8 +48061,7 @@ async function openPhyEventClose(eventId) {
    
 
                        
-     
-     
+        
 // Generate new physical event ticket card (your requested format)
 function generateNewPhyEventTicketCard(ticket) {
     const eventData = ticket.eventData;
@@ -49342,8 +49446,9 @@ window.addEventListener('resize', function() {
         console.log('Window resized, new width:', window.innerWidth);
     }, 250);
 });
-function openTicketValidatorOptions() {
-    closeTicketsSelectionModal();
+
+                 function openTicketValidatorOptions() {
+    console.log('Opening ticket validator options...'); // Debug log
     
     const existingModal = document.getElementById('validatorOptionsModal');
     if (existingModal) {
@@ -49380,7 +49485,7 @@ function openTicketValidatorOptions() {
                 max-height: ${isMobile ? '90vh' : 'auto'};
                 overflow-y: auto;
             ">
-                <button onclick="closeValidatorOptionsModal()" class="touch-button" style="
+                <button class="close-validator-modal-btn touch-button" style="
                     position: absolute;
                     top: 15px;
                     right: 20px;
@@ -49396,6 +49501,7 @@ function openTicketValidatorOptions() {
                     display: flex;
                     align-items: center;
                     justify-content: center;
+                    z-index: 10001;
                 ">
                     <i class="fas fa-times"></i>
                 </button>
@@ -49405,7 +49511,7 @@ function openTicketValidatorOptions() {
                 </h2>
                 
                 <div style="display: flex; flex-direction: column; gap: ${isMobile ? '15px' : '20px'};">
-                    <button onclick="openTicketInputScanner()" class="touch-button mobile-button no-select" style="
+                    <button class="ticket-input-scanner-btn touch-button mobile-button no-select" style="
                         background: rgba(255, 255, 255, 0.1);
                         border: 2px solid rgba(255, 255, 255, 0.3);
                         color: white;
@@ -49423,7 +49529,7 @@ function openTicketValidatorOptions() {
                         Ticket Input Scanner
                     </button>
                     
-                    <button onclick="openTicketQRScanner()" class="touch-button mobile-button no-select" style="
+                    <button class="ticket-qr-scanner-btn touch-button mobile-button no-select" style="
                         background: rgba(255, 255, 255, 0.1);
                         border: 2px solid rgba(255, 255, 255, 0.3);
                         color: white;
@@ -49449,18 +49555,49 @@ function openTicketValidatorOptions() {
                 </div>
             </div>
         </div>
-                
-               
     `;
     
     document.body.insertAdjacentHTML('beforeend', modalHTML);
     document.body.style.overflow = 'hidden';
-     // Add touch event listeners for mobile
-    if (isMobile) {
-        addMobileTouchHandlers();
-    }
+    
+    // Add event listeners instead of onclick attributes
+    setTimeout(() => {
+        const inputScannerBtn = document.querySelector('.ticket-input-scanner-btn');
+        const qrScannerBtn = document.querySelector('.ticket-qr-scanner-btn');
+        const closeBtn = document.querySelector('.close-validator-modal-btn');
+        
+        if (inputScannerBtn) {
+            inputScannerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Input scanner button clicked'); // Debug log
+                openTicketInputScanner();
+            });
+        }
+        
+        if (qrScannerBtn) {
+            qrScannerBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('QR scanner button clicked'); // Debug log
+                openTicketQRScanner();
+            });
+        }
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                closeValidatorOptionsModal();
+            });
+        }
+        
+        // Add mobile touch handlers
+        if (isMobile) {
+            addMobileTouchHandlers();
+        }
+    }, 100);
 }
-
 
 
 
@@ -50476,18 +50613,30 @@ function cancelTicketValidation(inputNumber) {
     }
 }
 
+
 function openTicketQRScanner() {
-    closeValidatorOptionsModal();
+    console.log('Opening QR scanner...'); // Debug log
     
-    // Check if session is still valid
-    if (currentValidationEventId && validationSessionStart && 
-        (Date.now() - validationSessionStart < validationSessionDuration)) {
-        showQRScanner();
-        return;
+    try {
+        closeValidatorOptionsModal();
+        
+        // Check if session is still valid
+        if (currentValidationEventId && validationSessionStart && 
+            (Date.now() - validationSessionStart < validationSessionDuration)) {
+            console.log('Using existing session for QR'); // Debug log
+            showQRScanner();
+            return;
+        }
+        
+        console.log('Starting new QR session'); // Debug log
+        showEventIdInput('qr');
+        
+    } catch (error) {
+        console.error('Error opening QR scanner:', error);
+        alert('Error opening QR scanner: ' + error.message);
     }
-    
-    showEventIdInput('qr');
 }
+
 
 function showQRScanner() {
     const existingPage = document.getElementById('qrScannerPage');
@@ -51051,15 +51200,16 @@ async function loadNewEventTickets() {
         // Query BoughtTicket collection for current user
         const ticketsSnapshot = await db.collection('BoughtTicket')
             .where('userId', '==', currentUser.uid)
+            .where('boughtticketstatus', '==', 'unused')
             .get();
 
         if (ticketsSnapshot.empty) {
             container.innerHTML = `
                 <div style="text-align: center; color: white; padding: 40px;">
                     <i class="fas fa-ticket-alt" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
-                    <h3 style="margin-bottom: 10px;">No Tickets Yet</h3>
-                    <p style="margin-bottom: 20px;">You don't have any tickets yet</p>
-                    <a href="https://rewarder-hub.vercel.app" style="
+                    <h3 style="margin-bottom: 10px;">No Active Tickets</h3>
+                    <p style="margin-bottom: 20px;">You don't have any unused tickets yet</p>
+                    <a href="https://rewarderhub.vercel.app" style="
                         color: #4ECDC4;
                         text-decoration: none;
                         font-weight: 600;
@@ -51086,115 +51236,46 @@ async function loadNewEventTickets() {
         // Fetch all event data
         const eventSnapshots = await Promise.all(eventPromises);
         
-        // Filter for new/active tickets and combine with event data
-        const newTickets = [];
+        // Filter out expired tickets and combine with event data
+        const validTickets = [];
         tickets.forEach((ticket, index) => {
             const eventSnapshot = eventSnapshots[index];
             if (eventSnapshot.exists) {
                 const eventData = eventSnapshot.data();
+                const eventEndDate = new Date(eventData.endDateTime);
                 const now = new Date();
                 
-                // Check if ticket should be shown in "new" section
-                const isTBA = eventData.schedulingStatus === 'TBA' || 
-                             eventData.startDateTime === 'TBA' || 
-                             eventData.endDateTime === 'TBA' ||
-                             eventData.isTBA === true;
-                
-                const shouldShowTicket = ticket.boughtticketstatus === 'unused' && (
-                    // TBA events are always shown
-                    isTBA || 
-                    // Non-TBA events that haven't ended
-                    (eventData.endDateTime !== 'TBA' && new Date(eventData.endDateTime) > now)
-                );
-                
-                if (shouldShowTicket) {
-                    newTickets.push({
+                // Only include tickets for events that haven't ended
+                if (eventEndDate > now) {
+                    validTickets.push({
                         ...ticket,
-                        eventData: eventData,
-                        isTBA: isTBA
+                        eventData: eventData
                     });
                 }
             }
         });
 
-        if (newTickets.length === 0) {
+        if (validTickets.length === 0) {
             container.innerHTML = `
                 <div style="text-align: center; color: white; padding: 40px;">
                     <i class="fas fa-calendar-times" style="font-size: 48px; margin-bottom: 20px; opacity: 0.5;"></i>
-                    <h3 style="margin-bottom: 10px;">No Active Tickets</h3>
-                    <p style="margin-bottom: 20px;">All your tickets have been used or expired</p>
+                    <h3 style="margin-bottom: 10px;">No Current Events</h3>
+                    <p style="margin-bottom: 20px;">All your tickets are for past events</p>
                     <a href="https://rewarder-hub.vercel.app" style="
                         color: #4ECDC4;
                         text-decoration: none;
                         font-weight: 600;
-                    ">Get more tickets at Rewarder Hub</a>
+                    ">Find new events at Rewarder Hub</a>
                 </div>
             `;
             return;
-        }
-
-        // Sort tickets: TBA events first, then by date
-        newTickets.sort((a, b) => {
-            if (a.isTBA && !b.isTBA) return -1;
-            if (!a.isTBA && b.isTBA) return 1;
-            
-            if (!a.isTBA && !b.isTBA) {
-                const dateA = new Date(a.eventData.startDateTime);
-                const dateB = new Date(b.eventData.startDateTime);
-                return dateA - dateB;
-            }
-            
-            return 0;
-        });
-
-        const tbaCount = newTickets.filter(t => t.isTBA).length;
-
-        // Generate new ticket cards with TBA handling
-        const ticketCardsHTML = newTickets.map(ticket => generateNewPhyEventTicketCard(ticket)).join('');
+        } // Generate ticket cards
+        const ticketCardsHTML = validTickets.map(ticket => generateNewPhyEventTicketCard(ticket)).join('');
         container.innerHTML = `
             <div style="display: flex; flex-direction: column; gap: 20px;">
-                ${tbaCount > 0 ? `
-                    <div style="
-                        background: rgba(255, 193, 7, 0.1);
-                        border: 1px solid rgba(255, 193, 7, 0.3);
-                        border-radius: 12px;
-                        padding: 16px;
-                        text-align: center;
-                        margin-bottom: 10px;
-                        animation: tbaPulse 3s ease-in-out infinite;
-                    ">
-                        <div style="display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px;">
-                            <i class="fas fa-clock" style="color: #ffc107; font-size: 18px;"></i>
-                            <span style="color: #ffc107; font-weight: 700; font-size: 16px;">
-                                TBA Events
-                            </span>
-                        </div>
-                        <span style="color: rgba(255, 193, 7, 0.9); font-weight: 500; font-size: 14px;">
-                            You have ${tbaCount} ticket${tbaCount > 1 ? 's' : ''} for events with dates to be announced
-                        </span>
-                        <div style="margin-top: 8px;">
-                            <button onclick="refreshTBATickets()" style="
-                                background: rgba(255, 193, 7, 0.2);
-                                border: 1px solid #ffc107;
-                                color: #ffc107;
-                                padding: 6px 12px;
-                                border-radius: 6px;
-                                font-size: 12px;
-                                font-weight: 600;
-                                cursor: pointer;
-                                transition: all 0.3s ease;
-                            " onmouseover="this.style.background='rgba(255, 193, 7, 0.3)'" onmouseout="this.style.background='rgba(255, 193, 7, 0.2)'">
-                                <i class="fas fa-sync-alt"></i> Check for Updates
-                            </button>
-                        </div>
-                    </div>
-                ` : ''}
                 ${ticketCardsHTML}
             </div>
         `;
-
-        // Set up real-time listener for TBA updates
-        setupTBATicketUpdates(currentUser.uid);
 
     } catch (error) {
         console.error('Error loading new tickets:', error);
@@ -51203,502 +51284,13 @@ async function loadNewEventTickets() {
                 <i class="fas fa-exclamation-triangle" style="font-size: 48px; margin-bottom: 20px; color: #ff4757;"></i>
                 <h3 style="margin-bottom: 10px; color: #ff4757;">Error Loading Tickets</h3>
                 <p>Please try again later</p>
-                <button onclick="loadNewEventTickets()" style="
-                    background: #4ECDC4;
-                    color: white;
-                    border: none;
-                    padding: 10px 20px;
-                    border-radius: 8px;
-                    margin-top: 15px;
-                    cursor: pointer;
-                ">Try Again</button>
             </div>
         `;
     }
-}
-
-// Enhanced ticket card generation to handle TBA events
-function generateNewPhyEventTicketCard(ticket) {
-    const eventData = ticket.eventData;
-    const isMobile = window.innerWidth <= 768;
-    const isSmallMobile = window.innerWidth <= 480;
-    const isTBA = ticket.isTBA;
-    
-    // Generate unique ID for this card
-    const cardId = 'new-ticket-card-' + ticket.id.replace(/[^a-zA-Z0-9]/g, '');
-    
-    // Handle TBA vs scheduled date formatting
-    let formattedDate, formattedTime;
-    if (isTBA) {
-        formattedDate = 'To Be Announced';
-        formattedTime = 'Time TBA';
-    } else {
-        const startDate = new Date(eventData.startDateTime);
-        const endDate = new Date(eventData.endDateTime);
-        formattedDate = startDate.toLocaleDateString('en-US', { 
-            weekday: 'short', 
-            year: 'numeric', 
-            month: 'short', 
-            day: 'numeric' 
-        });
-        formattedTime = `${startDate.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        })} - ${endDate.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-        })}`;
-    }
-
-    // Generate background style
-    let backgroundStyle = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);';
-    if (ticket.eventbackground) {
-        if (ticket.eventbackground.type === 'media') {
-            backgroundStyle = `background-image: linear-gradient(rgba(0,0,0,0.3), rgba(0,0,0,0.3)), url('${ticket.eventbackground.data}'); background-size: cover; background-position: center;`;
-        } else if (ticket.eventbackground.type === 'gradient') {
-            backgroundStyle = `background: ${ticket.eventbackground.gradient};`;
-        } else if (ticket.eventbackground.type === 'color') {
-            backgroundStyle = `background-color: ${ticket.eventbackground.color};`;
-        }
-    } else if (ticket.boughtticketbackground) {
-        backgroundStyle = `background: ${ticket.boughtticketbackground};`;
-    }
-
-    // Add TBA visual indicator
-    if (isTBA) {
-        backgroundStyle += ' filter: hue-rotate(45deg) brightness(0.8);';
-    }
-
-    // Generate sponsors HTML or fallback
-    let sponsorsHTML = '';
-    if (eventData.sponsors && eventData.sponsors.length > 0) {
-        const displaySponsors = eventData.sponsors.slice(0, 5);
-        sponsorsHTML = `
-            <div style="
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 10px;
-                display: flex;
-                gap: 10px;
-                align-items: center;
-                flex-wrap: wrap;
-                justify-content: center;
-            ">
-                <span style="color: white; font-size: 12px; font-weight: 600; margin-right: 5px;">Sponsors:</span>
-                ${displaySponsors.map(sponsor => {
-                    if (sponsor.logo && sponsor.logo.data) {
-                        return `<img src="${sponsor.logo.data}" alt="${sponsor.name}" style="height: 30px; width: auto; border-radius: 5px; background: white; padding: 2px;">`;
-                    } else {
-                        return `<div style="background: rgba(255,255,255,0.2); padding: 5px 10px; border-radius: 5px; font-size: 10px; color: white;">${sponsor.name}</div>`;
-                    }
-                }).join('')}
-            </div>
-        `;
-    } else {
-        sponsorsHTML = `
-            <div style="
-                background: rgba(255, 255, 255, 0.1);
-                border-radius: 10px;
-                padding: 15px;
-                text-align: center;
-            ">
-                <a href="https://rewarder-hub.vercel.app" style="
-                    color: #4ECDC4;
-                    text-decoration: none;
-                    font-size: 14px;
-                    font-weight: 600;
-                " target="_blank">
-                    🎫 Get more tickets at rewarder-hub.vercel.app
-                </a>
-            </div>
-        `;
-    }
-
-    // Get stored user name or placeholder
-    const savedBuyerName = ticket.ticketbuyername || '';
-
-    return `
-        <div style="
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 20px;
-            padding: ${isMobile ? '15px' : '20px'};
-            margin-bottom: ${isMobile ? '15px' : '20px'};
-            backdrop-filter: blur(10px);
-            border: 1px solid ${isTBA ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 255, 255, 0.2)'};
-            transition: all 0.3s ease;
-            box-sizing: border-box;
-            ${isTBA ? 'position: relative; overflow: hidden;' : ''}
-        " onmouseover="${!isMobile ? `this.style.transform='translateY(-5px)'; this.style.boxShadow='0 20px 40px rgba(0,0,0,0.2)'` : ''}" 
-           onmouseout="${!isMobile ? `this.style.transform='translateY(0)'; this.style.boxShadow='none'` : ''}">
-            
-            ${isTBA ? `
-            <!-- TBA Badge -->
-            <div style="
-                position: absolute;
-                top: 10px;
-                right: 10px;
-                background: rgba(255, 193, 7, 0.9);
-                color: white;
-                padding: 4px 8px;
-                border-radius: 12px;
-                font-size: 10px;
-                font-weight: 700;
-                z-index: 2;
-                animation: tbaBadgePulse 2s ease-in-out infinite;
-            ">
-                TBA
-            </div>
-            ` : ''}
-            
-            <!-- Main Card Content -->
-            <div style="
-                display: ${isMobile ? 'block' : 'flex'}; 
-                gap: ${isMobile ? '0' : '20px'}; 
-                margin-bottom: ${isMobile ? '15px' : '20px'};
-            ">
-                
-                <!-- Event Background Container -->
-                <div style="
-                    ${isMobile ? 'width: 100%; margin-bottom: 15px;' : 'flex: 0 0 200px;'}
-                    height: ${isSmallMobile ? '120px' : isMobile ? '140px' : '150px'};
-                    border-radius: 15px;
-                    ${backgroundStyle}
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    color: white;
-                    font-weight: 600;
-                    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-                    position: relative;
-                    overflow: hidden;
-                ">
-                    <div style="
-                        position: absolute;
-                        top: 0;
-                        left: 0;
-                        right: 0;
-                        bottom: 0;
-                        background: rgba(0,0,0,0.2);
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    ">
-                        <i class="fas fa-${isTBA ? 'clock' : 'ticket-alt'}" style="font-size: ${isSmallMobile ? '20px' : isMobile ? '24px' : '32px'}; opacity: 0.8;"></i>
-                    </div>
-                </div>
-                
-                <!-- Ticket Details -->
-                <div style="${isMobile ? 'width: 100%;' : 'flex: 1;'} color: white;">
-                    <!-- User Name Input (Always Visible) -->
-                    <div style="margin-bottom: ${isMobile ? '12px' : '15px'};">
-                        <input 
-                            type="text" 
-                            id="ticketName_${ticket.id}"
-                            placeholder="Enter your name for this ticket" 
-                            value="${savedBuyerName}"
-                            ${ticket.boughtticketstatus !== 'unused' ? 'readonly' : ''}
-                            style="
-                                width: 100%;
-                                padding: ${isMobile ? '12px' : '10px'};
-                                border: 2px solid ${isTBA ? 'rgba(255, 193, 7, 0.3)' : 'rgba(255, 255, 255, 0.3)'};
-                                border-radius: 8px;
-                                background: rgba(255, 255, 255, 0.1);
-                                color: white;
-                                font-size: ${isSmallMobile ? '14px' : isMobile ? '15px' : '16px'};
-                                font-weight: 600;
-                                box-sizing: border-box;
-                                ${ticket.boughtticketstatus !== 'unused' ? 'opacity: 0.6; cursor: not-allowed;' : ''}
-                                -webkit-appearance: none;
-                            "
-                        />
-                    </div>
-                    
-                    ${ticket.boughtticketstatus === 'unused' ? `
-                    <!-- Save Button (Always Visible) -->
-                    <button onclick="saveTicketBuyerName('${ticket.id}')" style="
-                        background: #4ECDC4;
-                        color: white;
-                        border: none;
-                        padding: ${isMobile ? '10px 16px' : '8px 15px'};
-                        border-radius: 6px;
-                        font-size: ${isMobile ? '13px' : '12px'};
-                        font-weight: 600;
-                        cursor: pointer;
-                        margin-bottom: ${isMobile ? '12px' : '0'};
-                        ${isMobile ? 'width: 100%; min-height: 44px;' : 'margin-left: 10px;'}
-                        transition: all 0.3s ease;
-                        box-sizing: border-box;
-                        -webkit-appearance: none;
-                    " onmouseover="this.style.background='#45a9a9'" onmouseout="this.style.background='#4ECDC4'">
-                        Save Name
-                    </button>
-                    ` : ''}
-
-                    ${isMobile ? `
-                    <!-- Mobile Toggle Button -->
-                    <button onclick="toggleNewTicketDetails('${cardId}')" style="
-                        background: rgba(76, 217, 196, 0.2);
-                        border: 2px solid #4CD9C4;
-                        color: #4CD9C4;
-                        padding: 10px 16px;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: 600;
-                        cursor: pointer;
-                        width: 100%;
-                        margin-bottom: 12px;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        gap: 8px;
-                        transition: all 0.3s ease;
-                        min-height: 44px;
-                        box-sizing: border-box;
-                        -webkit-user-select: none;
-                        user-select: none;
-                        -webkit-appearance: none;
-                    " onmouseover="this.style.background='rgba(76, 217, 196, 0.3)'" onmouseout="this.style.background='rgba(76, 217, 196, 0.2)'">
-                        <i class="fas fa-chevron-down" id="${cardId}-icon" style="transition: transform 0.3s ease;"></i>
-                        <span id="${cardId}-text">Show Ticket Details</span>
-                    </button>
-                    ` : ''}
-
-                    <!-- Ticket Info (Collapsible on Mobile) -->
-                    <div id="${cardId}-details" style="
-                        display: ${isMobile ? 'none' : 'flex'}; 
-                        flex-direction: column; 
-                        gap: ${isMobile ? '6px' : '8px'};
-                        ${isMobile ? 'overflow: hidden; transition: all 0.3s ease;' : ''}
-                    ">
-                        <div style="font-size: ${isSmallMobile ? '11px' : isMobile ? '12px' : '14px'}; opacity: 0.8; word-break: break-all;">
-                            <strong>Ticket ID:</strong> ${ticket.ticketid}
-                        </div>
-                        <div style="font-size: ${isSmallMobile ? '13px' : isMobile ? '14px' : '16px'}; font-weight: 600;">
-                            <strong>Type:</strong> ${ticket.boughtticketname}
-                        </div>
-                        <div style="font-size: ${isSmallMobile ? '11px' : isMobile ? '12px' : '14px'}; color: ${isTBA ? '#ffc107' : 'white'};">
-                            <strong>Date:</strong> ${formattedDate}
-                        </div>
-                        <div style="font-size: ${isSmallMobile ? '11px' : isMobile ? '12px' : '14px'}; color: ${isTBA ? '#ffc107' : 'white'};">
-                            <strong>Time:</strong> ${formattedTime}
-                        </div>
-                        <div style="font-size: ${isSmallMobile ? '11px' : isMobile ? '12px' : '14px'}; word-break: break-word;">
-                            <strong>Location:</strong> ${eventData.location}
-                        </div>
-                        
-                        ${isTBA ? `
-                        <div style="
-                            background: rgba(255, 193, 7, 0.2);
-                            border: 1px solid rgba(255, 193, 7, 0.4);
-                            border-radius: 8px;
-                            padding: 10px;
-                            margin-top: 10px;
-                        ">
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 5px;">
-                                <i class="fas fa-info-circle" style="color: #ffc107; font-size: 14px;"></i>
-                                <span style="color: #ffc107; font-weight: 600; font-size: 12px;">Event Schedule TBA</span>
-                            </div>
-                            <p style="color: rgba(255, 193, 7, 0.9); font-size: 11px; margin: 0; line-height: 1.4;">
-                                The event organizer will announce the date and time soon. You'll be notified when details are confirmed.
-                            </p>
-                        </div>
-                        ` : ''}
-                        
-                        <!-- QR Code Button -->
-                        <button onclick="showTicketQRCode('${ticket.id}', '${ticket.boughtticketqrcode}')" style="
-                            background: #4ECDC4;
-                            color: white;
-                            border: none;
-                            padding: ${isMobile ? '12px 16px' : '10px 20px'};
-                            border-radius: 8px;
-                            font-size: ${isSmallMobile ? '12px' : isMobile ? '13px' : '14px'};
-                            font-weight: 600;
-                            cursor: pointer;
-                            margin-top: ${isMobile ? '12px' : '10px'};
-                            width: ${isMobile ? '100%' : 'auto'};
-                            min-height: ${isMobile ? '44px' : 'auto'};
-                            transition: all 0.3s ease;
-                            box-sizing: border-box;
-                            display: flex;
-                            align-items: center;
-                            justify-content: center;
-                            gap: 8px;
-                            -webkit-appearance: none;
-                        " onmouseover="this.style.background='#45a9a9'" onmouseout="this.style.background='#4ECDC4'">
-                            <i class="fas fa-qrcode" style="font-size: ${isSmallMobile ? '12px' : '14px'};"></i>
-                            <span>View QR Code</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Sponsors Section (Hidden on Mobile when details are collapsed) -->
-            <div id="${cardId}-sponsors" style="display: ${isMobile ? 'none' : 'block'};">
-                ${sponsorsHTML}
-            </div>
-        </div>
-    `;
-}
-
-// Set up real-time listener for TBA event updates
-function setupTBATicketUpdates(userId) {
-    if (!db || !userId) return;
-    
-    // Listen for changes to physical events that user has tickets for
-    db.collection('physicalEvents')
-        .where('schedulingStatus', '==', 'scheduled') // Listen for events that changed from TBA
-        .onSnapshot((snapshot) => {
-            let hasRelevantUpdates = false;
-            
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === 'modified') {
-                    const eventData = change.doc.data();
-                    // Check if this event went from TBA to scheduled
-                    if (eventData.startDateTime !== 'TBA' && eventData.endDateTime !== 'TBA') {
-                        hasRelevantUpdates = true;
-                        showTBAUpdateNotification(eventData);
-                    }
-                }
-            });
-            
-            if (hasRelevantUpdates) {
-                // Reload tickets to show updated information
-                setTimeout(() => {
-                    loadNewEventTickets();
-                }, 2000);
-            }
-        }, (error) => {
-            console.error('Error listening for TBA updates:', error);
-        });
-}
-
-// Show notification when TBA event gets scheduled
-function showTBAUpdateNotification(eventData) {
-    // Remove any existing notification
-    const existingNotification = document.getElementById('tba-update-notification');
-    if (existingNotification) {
-        existingNotification.remove();
-    }
-    
-    const notification = document.createElement('div');
-    notification.id = 'tba-update-notification';
-    notification.style.cssText = `
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: linear-gradient(135deg, #4ECDC4, #45a9a9);
-        color: white;
-        padding: 16px 20px;
-        border-radius: 12px;
-        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        z-index: 10000;
-        max-width: 350px;
-        animation: slideInRight 0.5s ease-out;
-    `;
-    
-    notification.innerHTML = `
-        <div style="display: flex; align-items: start; gap: 12px;">
-            <i class="fas fa-calendar-check" style="font-size: 20px; color: #fff; margin-top: 2px;"></i>
-            <div style="flex: 1;">
-                <h4 style="margin: 0 0 8px 0; font-size: 16px; font-weight: 600;">Event Date Announced!</h4>
-                <p style="margin: 0 0 12px 0; font-size: 14px; opacity: 0.9; line-height: 1.4;">
-                    "${eventData.eventName}" now has a scheduled date. Check your tickets for details.
-                </p>
-                <button onclick="this.closest('#tba-update-notification').remove(); loadNewEventTickets();" style="
-                    background: rgba(255, 255, 255, 0.2);
-                    border: 1px solid rgba(255, 255, 255, 0.3);
-                    color: white;
-                    padding: 6px 12px;
-                    border-radius: 6px;
-                    font-size: 12px;
-                    font-weight: 600;
-                    cursor: pointer;
-                ">
-                    View Tickets
-                </button>
-            </div>
-            <button onclick="this.closest('#tba-update-notification').remove();" style="
-                background: none;
-                border: none;
-                color: white;
-                font-size: 18px;
-                cursor: pointer;
-                opacity: 0.7;
-                padding: 4px;
-            ">×</button>
-        </div>
-    `;
-    
-    document.body.appendChild(notification);
-    
-    // Auto remove after 8 seconds
-    setTimeout(() => {
-        if (notification && notification.parentNode) {
-            notification.style.animation = 'slideOutRight 0.5s ease-in';
-            setTimeout(() => notification.remove(), 500);
-        }
-    }, 8000);
-}
-
-// Manual refresh function for TBA tickets
-async function refreshTBATickets() {
-    const button = event.target;
-    const originalHTML = button.innerHTML;
-    
-    button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Checking...';
-    button.disabled = true;
-    
-    try {
-        await loadNewEventTickets();
-        
-        // Show temporary success state
-        button.innerHTML = '<i class="fas fa-check"></i> Updated!';
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.disabled = false;
-        }, 2000);
-        
-    } catch (error) {
-        console.error('Error refreshing TBA tickets:', error);
-        button.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Error';
-        setTimeout(() => {
-            button.innerHTML = originalHTML;
-            button.disabled = false;
-        }, 2000);
-    }
-}
-
-// CSS animations for TBA elements
-const tbaStyles = `
-<style>
-@keyframes tbaPulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50% { transform: scale(1.02); opacity: 0.8; }
-}
-
-@keyframes tbaBadgePulse {
-    0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.4); }
-    50% { transform: scale(1.1); box-shadow: 0 0 0 8px rgba(255, 193, 7, 0); }
-}
-
-@keyframes slideInRight {
-    0% { transform: translateX(100%); opacity: 0; }
-    100% { transform: translateX(0); opacity: 1; }
-}
-
-@keyframes slideOutRight {
-    0% { transform: translateX(0); opacity: 1; }
-    100% { transform: translateX(100%); opacity: 0; }
-}
-</style>
-`;
-
-// Inject TBA styles
-document.head.insertAdjacentHTML('beforeend', tbaStyles);
+} 
 
 
 
-  
 // Sport Event Page JavaScript
 class SportEventPage {
     constructor() {
@@ -62185,6 +61777,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 
+
        </script>
 
 
@@ -62979,9 +62572,6 @@ document.addEventListener('DOMContentLoaded', function() {
         font-size: 20px !important;
     }
 }
-
-
-
 
 /* Responsive Auto-scrolling Banner Styles */
 .banner-section {
