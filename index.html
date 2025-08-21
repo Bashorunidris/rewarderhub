@@ -21166,6 +21166,8 @@ tba-option {
 </head>
 <body>
     
+             
+       
     <!-- Event Page Section (Hidden by default) -->
     <div id="eventPageContainer" style="display: none;">
         <div id="eventPageContent">
@@ -21466,8 +21468,8 @@ tba-option {
                 min="100"
                 max="100000000"
             >
-            <button onclick="calculateFee()" class="calculate-btn">Calculate Fee</button>
-        </div>
+            <button onclick="calculateFee()" class="calculate-btn">Calculate Fee</button>         
+                </div>
         
         <div class="fee-display" id="feeDisplay" style="display: none;">
             <div class="fee-breakdown">
@@ -22215,10 +22217,6 @@ tba-option {
     
 </div>
 
-        <div class="wallet1-btn">
-          
-       
-             
        
     </div>
     
@@ -26192,7 +26190,7 @@ tba-option {
         </div>
     </div>
 </div>
-!-- Awards Modal (Complete) -->
+<!-- Awards Modal (Complete) -->
 <div id="awardsModal" class="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100vh; background: rgba(0,0,0,0.8); z-index: 10001; justify-content: center; align-items: center; overflow-y: auto;">
     <div class="awards-modal-content" style="
         background: white;
@@ -26607,7 +26605,9 @@ tba-option {
         </div>
     </div>
 </div>
-<!-- Firebase SDK -->
+              
+            
+                             
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
@@ -62573,6 +62573,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 }
 
+
 /* Responsive Auto-scrolling Banner Styles */
 .banner-section {
     margin-bottom: clamp(20px, 5vw, 40px);
@@ -62876,7 +62877,9 @@ document.addEventListener('DOMContentLoaded', function() {
 .banner-item img[src=""]::after {
     display: block;
 }
+}
 </style>
 
 </body>
 </html>
+
