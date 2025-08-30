@@ -35789,13 +35789,13 @@ let phyPromoApplied = false;
 function calculatePhyServiceFee(amount) {
     if (amount <= 1) return 0;
     if (amount <= 500) return 50;
-    if (amount <= 2000) return 100;
-    if (amount <= 3000) return 150;
-    if (amount <= 5000) return 200;
-    if (amount <= 10000) return 600;
-    if (amount <= 15000) return 700;
-    if (amount <= 20000) return 900;
-    if (amount <= 25000) return 1150;
+    if (amount <= 1000) return 100;
+    if (amount <= 2000) return 150;
+    if (amount <= 3000) return 200;
+    if (amount <= 9000) return 600;
+    if (amount <= 10000) return 700;
+    if (amount <= 15000) return 900;
+    if (amount <= 20000) return 1150;
     if (amount <= 30000) return 1400;
     if (amount <= 35000) return 1650;
     if (amount <= 40000) return 1900;
@@ -62882,6 +62882,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </body>
 </html>
+
 
 
 
